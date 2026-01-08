@@ -74,11 +74,22 @@ export function TimelineWorkspace() {
       
       updateTile(tileId, { isGenerating: true });
       
+      let referenceFrame: string | undefined;
+      
+      if (tile.type === "video") {
+        const aboveImageTile = currentTiles.find(
+          (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position
+        );
+        if (aboveImageTile?.mediaUrl) {
+          referenceFrame = aboveImageTile.mediaUrl;
+        }
+      }
+      
       const response = await apiRequest("POST", `/api/generate/${tile.type}`, {
         prompt: tile.prompt,
         provider: tile.provider,
         tileId,
-        initialFrame: tile.mediaUrl,
+        initialFrame: referenceFrame || tile.mediaUrl,
       });
       
       const result = await response.json() as { mediaUrl: string };
@@ -104,40 +115,11 @@ export function TimelineWorkspace() {
         );
         
         videoTiles.forEach((videoTile) => {
-          updateTile(videoTile.id, { mediaUrl: newMediaUrl });
-          updateTileMutation.mutate({ 
-            id: videoTile.id, 
-            updates: { mediaUrl: newMediaUrl } 
-          });
-          
           if (videoTile.prompt && !videoTile.isGenerating) {
             setTimeout(() => {
               generateMutation.mutate(videoTile.id);
             }, 200);
           }
-        });
-      }
-
-      if (tile.type === "video") {
-        const nextImageTiles = currentTiles.filter(
-          (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
-        );
-        
-        nextImageTiles.forEach((imageTile) => {
-          const framePercent = 100;
-          const frameBasedUrl = `${newMediaUrl}?frame=${framePercent}`;
-          
-          updateTile(imageTile.id, { 
-            mediaUrl: frameBasedUrl,
-            selectedFrame: framePercent
-          });
-          updateTileMutation.mutate({ 
-            id: imageTile.id, 
-            updates: { 
-              mediaUrl: frameBasedUrl,
-              selectedFrame: framePercent
-            } 
-          });
         });
       }
 
@@ -148,8 +130,6 @@ export function TimelineWorkspace() {
     },
     onError: (error, tileId) => {
       const placeholderUrl = `https://picsum.photos/seed/${tileId}/400/300`;
-      const currentTiles = tilesRef.current;
-      const tile = currentTiles.find((t) => t.id === tileId);
       
       updateTile(tileId, { 
         isGenerating: false,
@@ -159,28 +139,6 @@ export function TimelineWorkspace() {
         id: tileId, 
         updates: { isGenerating: false, mediaUrl: placeholderUrl } 
       });
-      
-      if (tile) {
-        if (tile.type === "image") {
-          const videoTiles = currentTiles.filter(
-            (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
-          );
-          videoTiles.forEach((videoTile) => {
-            updateTile(videoTile.id, { mediaUrl: placeholderUrl });
-            updateTileMutation.mutate({ id: videoTile.id, updates: { mediaUrl: placeholderUrl } });
-          });
-        }
-        if (tile.type === "video") {
-          const nextImageTiles = currentTiles.filter(
-            (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
-          );
-          nextImageTiles.forEach((imageTile) => {
-            const frameBasedUrl = `${placeholderUrl}?frame=100`;
-            updateTile(imageTile.id, { mediaUrl: frameBasedUrl, selectedFrame: 100 });
-            updateTileMutation.mutate({ id: imageTile.id, updates: { mediaUrl: frameBasedUrl, selectedFrame: 100 } });
-          });
-        }
-      }
       
       toast({
         title: "Generation complete",
@@ -201,44 +159,20 @@ export function TimelineWorkspace() {
           updateTileMutation.mutate({ id: t.id, updates: { position: t.position + 1 } });
         });
 
-      const prevTile = timelineTiles.find((t) => t.position === position - 1);
-      let chainedMediaUrl: string | undefined;
-      
-      if (prevTile?.mediaUrl) {
-        chainedMediaUrl = prevTile.mediaUrl;
-      } else if (type === "image") {
-        const videoTiles = tiles.filter(
-          (t) => t.type === "video" && t.timelineId === timelineId && t.position === position - 1
-        );
-        if (videoTiles.length > 0 && videoTiles[0].mediaUrl) {
-          chainedMediaUrl = `${videoTiles[0].mediaUrl}?frame=100`;
-        }
-      } else if (type === "video") {
-        const imageTiles = tiles.filter(
-          (t) => t.type === "image" && t.timelineId === timelineId && t.position === position
-        );
-        if (imageTiles.length > 0 && imageTiles[0].mediaUrl) {
-          chainedMediaUrl = imageTiles[0].mediaUrl;
-        }
-      }
-
       const newTile: Omit<Tile, "id"> = {
         type,
         timelineId,
         position,
         prompt: "",
-        selectedFrame: type === "image" ? 100 : 0,
+        selectedFrame: 100,
         isGenerating: false,
-        mediaUrl: chainedMediaUrl,
       };
       
       createTileMutation.mutate(newTile);
 
       toast({
         title: `${type === "image" ? "Image" : "Video"} tile added`,
-        description: chainedMediaUrl 
-          ? "Chained from previous tile's frame" 
-          : "Click on the tile to edit the prompt",
+        description: "Click on the tile to edit the prompt",
       });
     },
     [tiles, createTileMutation, updateTileMutation, toast]
@@ -269,7 +203,7 @@ export function TimelineWorkspace() {
             timelineId: createdTimeline.id,
             position: 0,
             prompt: tile.prompt || "",
-            selectedFrame: 0,
+            selectedFrame: 100,
             isGenerating: false,
             mediaUrl: tile.mediaUrl,
           };
@@ -279,7 +213,7 @@ export function TimelineWorkspace() {
 
       toast({
         title: "Branch created",
-        description: "New branch created from this image with chained frame",
+        description: "New branch created from this image",
       });
     },
     [tiles, timelines, createTimelineMutation, createTileMutation, toast]
@@ -320,7 +254,7 @@ export function TimelineWorkspace() {
 
       toast({
         title: "Branch created",
-        description: "New branch created from this video with chained frame",
+        description: "New branch created from this video",
       });
     },
     [tiles, timelines, createTimelineMutation, createTileMutation, toast]
@@ -335,40 +269,13 @@ export function TimelineWorkspace() {
 
   const handleFrameSliderChange = useCallback(
     (tileId: string, framePercent: number, previousVideoUrl: string) => {
-      const tile = tiles.find((t) => t.id === tileId);
-      if (!tile) return;
-
-      const cleanVideoUrl = previousVideoUrl.split('?')[0];
-      const frameBasedUrl = `${cleanVideoUrl}?frame=${framePercent}`;
-      
-      updateTile(tileId, { 
-        selectedFrame: framePercent, 
-        mediaUrl: frameBasedUrl 
-      });
-      
+      updateTile(tileId, { selectedFrame: framePercent });
       updateTileMutation.mutate({ 
         id: tileId, 
-        updates: { selectedFrame: framePercent, mediaUrl: frameBasedUrl } 
-      });
-
-      const videoTiles = tiles.filter(
-        (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
-      );
-      videoTiles.forEach((vt) => {
-        updateTile(vt.id, { mediaUrl: frameBasedUrl });
-        updateTileMutation.mutate({ id: vt.id, updates: { mediaUrl: frameBasedUrl } });
-      });
-
-      const nextImageTiles = tiles.filter(
-        (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
-      );
-      nextImageTiles.forEach((nextTile) => {
-        const nextFrameUrl = `${cleanVideoUrl}?frame=${nextTile.selectedFrame || 100}`;
-        updateTile(nextTile.id, { mediaUrl: nextFrameUrl });
-        updateTileMutation.mutate({ id: nextTile.id, updates: { mediaUrl: nextFrameUrl } });
+        updates: { selectedFrame: framePercent } 
       });
     },
-    [tiles, updateTile, updateTileMutation]
+    [updateTile, updateTileMutation]
   );
 
   const handleDeleteTimeline = useCallback(

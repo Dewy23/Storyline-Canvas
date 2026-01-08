@@ -29,6 +29,10 @@ export function TimelineRow({
     .filter((t) => t.type === type && t.timelineId === timeline.id)
     .sort((a, b) => a.position - b.position);
 
+  const imageTiles = allTiles
+    .filter((t) => t.type === "image" && t.timelineId === timeline.id)
+    .sort((a, b) => a.position - b.position);
+
   const videoTiles = allTiles
     .filter((t) => t.type === "video" && t.timelineId === timeline.id)
     .sort((a, b) => a.position - b.position);
@@ -36,6 +40,11 @@ export function TimelineRow({
   const getPreviousVideoTile = (imageTile: TileType): TileType | undefined => {
     if (imageTile.type !== "image") return undefined;
     return videoTiles.find((vt) => vt.position === imageTile.position - 1);
+  };
+
+  const getAboveImageTile = (videoTile: TileType): TileType | undefined => {
+    if (videoTile.type !== "video") return undefined;
+    return imageTiles.find((it) => it.position === videoTile.position);
   };
 
   return (
@@ -64,7 +73,8 @@ export function TimelineRow({
                 onGenerate={() => onGenerate(tile.id)}
                 showBranchUp={type === "image"}
                 showBranchDown={type === "video"}
-                previousVideoTile={getPreviousVideoTile(tile)}
+                previousVideoTile={type === "image" ? getPreviousVideoTile(tile) : undefined}
+                aboveImageTile={type === "video" ? getAboveImageTile(tile) : undefined}
                 onFrameSliderChange={onFrameSliderChange}
               />
               <InsertButton

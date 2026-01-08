@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2, Maximize2, X } from "lucide-react";
+import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2, Maximize2, X, Film, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ interface TileProps {
   showBranchUp?: boolean;
   showBranchDown?: boolean;
   previousVideoTile?: TileType;
+  aboveImageTile?: TileType;
   onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
 }
 
@@ -43,9 +44,10 @@ export function Tile({
   showBranchUp = true,
   showBranchDown = true,
   previousVideoTile,
+  aboveImageTile,
   onFrameSliderChange,
 }: TileProps) {
-  const [activeTab, setActiveTab] = useState<"view" | "prompt">("view");
+  const [activeTab, setActiveTab] = useState<"view" | "prompt" | "source">("view");
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { updateTile, selectedTileId, setSelectedTileId } = useAppStore();
@@ -54,6 +56,7 @@ export function Tile({
   const providers = tile.type === "image" ? imageProviders : videoProviders;
 
   const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
+  const hasAboveImage = tile.type === "video" && aboveImageTile?.mediaUrl;
   
   const updateTileMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TileType> }) => {
@@ -91,11 +94,12 @@ export function Tile({
     if (previousVideoTile?.mediaUrl && onFrameSliderChange) {
       onFrameSliderChange(tile.id, framePercent, previousVideoTile.mediaUrl);
     } else if (previousVideoTile?.mediaUrl) {
-      const frameBasedUrl = `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
-      updateTile(tile.id, { mediaUrl: frameBasedUrl, selectedFrame: framePercent });
+      const cleanUrl = previousVideoTile.mediaUrl.split('?')[0];
+      const frameBasedUrl = `${cleanUrl}?frame=${framePercent}`;
+      updateTile(tile.id, { selectedFrame: framePercent });
       updateTileMutation.mutate({ 
         id: tile.id, 
-        updates: { mediaUrl: frameBasedUrl, selectedFrame: framePercent } 
+        updates: { selectedFrame: framePercent } 
       });
     }
   };
@@ -104,26 +108,40 @@ export function Tile({
     if (tile.mediaUrl) {
       return tile.mediaUrl;
     }
-    if (hasPreviousVideo && previousVideoTile?.mediaUrl) {
+    return null;
+  };
+
+  const getSourceFrameImage = () => {
+    if (tile.type === "image" && previousVideoTile?.mediaUrl) {
+      const cleanUrl = previousVideoTile.mediaUrl.split('?')[0];
       const framePercent = tile.selectedFrame || 100;
-      return `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
+      return `${cleanUrl}?frame=${framePercent}`;
+    }
+    return null;
+  };
+
+  const getReferenceImage = () => {
+    if (tile.type === "video" && aboveImageTile?.mediaUrl) {
+      return aboveImageTile.mediaUrl;
     }
     return null;
   };
 
   const previewImage = getPreviewImage();
+  const sourceFrameImage = getSourceFrameImage();
+  const referenceImage = getReferenceImage();
 
-  const handleFullscreen = useCallback((e: React.MouseEvent) => {
+  const handleFullscreen = useCallback((e: React.MouseEvent, imageUrl?: string | null) => {
     e.stopPropagation();
     
-    if (tile.type === "image") {
-      setIsLightboxOpen(true);
-    } else if (tile.type === "video" && videoRef.current) {
+    if (tile.type === "video" && activeTab === "view" && videoRef.current) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
       }
+    } else if (imageUrl) {
+      setIsLightboxOpen(true);
     }
-  }, [tile.type]);
+  }, [tile.type, activeTab]);
 
   const handleCloseLightbox = useCallback(() => {
     setIsLightboxOpen(false);
@@ -146,6 +164,12 @@ export function Tile({
       document.body.style.overflow = "";
     };
   }, [isLightboxOpen]);
+
+  const getLightboxImage = () => {
+    if (activeTab === "source" && sourceFrameImage) return sourceFrameImage;
+    if (activeTab === "source" && referenceImage) return referenceImage;
+    return previewImage;
+  };
 
   return (
     <>
@@ -170,13 +194,16 @@ export function Tile({
           onClick={() => setSelectedTileId(tile.id)}
           data-testid={`tile-${tile.type}-${tile.id}`}
         >
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "view" | "prompt")} className="flex flex-col h-full">
-            <TabsList className="h-8 w-full grid grid-cols-2 shrink-0">
-              <TabsTrigger value="view" className="text-xs" data-testid={`tab-view-${tile.id}`}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "view" | "prompt" | "source")} className="flex flex-col h-full">
+            <TabsList className="h-8 w-full grid grid-cols-3 shrink-0">
+              <TabsTrigger value="view" className="text-xs px-1" data-testid={`tab-view-${tile.id}`}>
                 View
               </TabsTrigger>
-              <TabsTrigger value="prompt" className="text-xs" data-testid={`tab-prompt-${tile.id}`}>
+              <TabsTrigger value="prompt" className="text-xs px-1" data-testid={`tab-prompt-${tile.id}`}>
                 Prompt
+              </TabsTrigger>
+              <TabsTrigger value="source" className="text-xs px-1" data-testid={`tab-source-${tile.id}`}>
+                {tile.type === "video" ? "Ref" : "Source"}
               </TabsTrigger>
             </TabsList>
 
@@ -216,7 +243,7 @@ export function Tile({
                 
                 {previewImage && (
                   <button
-                    onClick={handleFullscreen}
+                    onClick={(e) => handleFullscreen(e, previewImage)}
                     className="absolute bottom-1 right-1 p-1 rounded bg-black/40 text-white/70 opacity-0 group-hover/preview:opacity-100 hover:text-white hover:bg-black/60 transition-all"
                     data-testid={`button-fullscreen-${tile.id}`}
                     aria-label="View fullscreen"
@@ -225,24 +252,6 @@ export function Tile({
                   </button>
                 )}
               </div>
-              
-              {tile.type === "image" && tile.mediaUrl && !hasPreviousVideo && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>Frame</span>
-                    <span>{tile.selectedFrame}%</span>
-                  </div>
-                  <Slider
-                    value={[tile.selectedFrame]}
-                    onValueChange={handleFrameChange}
-                    min={0}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                    data-testid={`slider-frame-${tile.id}`}
-                  />
-                </div>
-              )}
             </TabsContent>
 
             <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
@@ -287,26 +296,86 @@ export function Tile({
                 Generate
               </Button>
             </TabsContent>
+
+            <TabsContent value="source" className="flex-1 m-0 p-2 flex flex-col gap-2">
+              {tile.type === "image" ? (
+                <>
+                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden relative group/preview">
+                    {sourceFrameImage ? (
+                      <img
+                        src={sourceFrameImage}
+                        alt="Source frame from video"
+                        className="w-full h-full object-cover"
+                        data-testid={`source-frame-image-${tile.id}`}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <Film className="w-6 h-6" />
+                        <span className="text-xs text-center px-2">No video source</span>
+                      </div>
+                    )}
+                    
+                    {sourceFrameImage && (
+                      <button
+                        onClick={(e) => handleFullscreen(e, sourceFrameImage)}
+                        className="absolute bottom-1 right-1 p-1 rounded bg-black/40 text-white/70 opacity-0 group-hover/preview:opacity-100 hover:text-white hover:bg-black/60 transition-all"
+                        data-testid={`button-fullscreen-source-${tile.id}`}
+                        aria-label="View fullscreen"
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {previousVideoTile?.mediaUrl && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>Frame</span>
+                        <span>{tile.selectedFrame}%</span>
+                      </div>
+                      <Slider
+                        value={[tile.selectedFrame]}
+                        onValueChange={handleVideoFrameSelect}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="w-full"
+                        data-testid={`slider-source-frame-${tile.id}`}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden relative group/preview">
+                  {referenceImage ? (
+                    <img
+                      src={referenceImage}
+                      alt="Reference image"
+                      className="w-full h-full object-cover"
+                      data-testid={`reference-image-${tile.id}`}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                      <ImageIcon className="w-6 h-6" />
+                      <span className="text-xs text-center px-2">No reference image</span>
+                    </div>
+                  )}
+                  
+                  {referenceImage && (
+                    <button
+                      onClick={(e) => handleFullscreen(e, referenceImage)}
+                      className="absolute bottom-1 right-1 p-1 rounded bg-black/40 text-white/70 opacity-0 group-hover/preview:opacity-100 hover:text-white hover:bg-black/60 transition-all"
+                      data-testid={`button-fullscreen-reference-${tile.id}`}
+                      aria-label="View fullscreen"
+                    >
+                      <Maximize2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </Card>
-
-        {hasPreviousVideo && (
-          <div className="w-48 mt-2 px-1 space-y-1">
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>Video Frame</span>
-              <span>{tile.selectedFrame}%</span>
-            </div>
-            <Slider
-              value={[tile.selectedFrame]}
-              onValueChange={handleVideoFrameSelect}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-              data-testid={`slider-video-frame-${tile.id}`}
-            />
-          </div>
-        )}
 
         {showBranchDown && tile.type === "video" && (
           <Button
@@ -322,7 +391,7 @@ export function Tile({
         )}
       </div>
 
-      {isLightboxOpen && previewImage && (
+      {isLightboxOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
           onClick={handleCloseLightbox}
@@ -338,7 +407,7 @@ export function Tile({
           </button>
           
           <img
-            src={previewImage}
+            src={getLightboxImage() || ""}
             alt="Fullscreen view"
             className="max-w-[90vw] max-h-[90vh] object-contain"
             onClick={(e) => e.stopPropagation()}
