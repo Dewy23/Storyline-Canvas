@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TimelineBranch } from "./timeline-branch";
@@ -7,10 +7,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Tile, Timeline } from "@shared/schema";
 
-function generateId() {
-  return Math.random().toString(36).substring(2, 15);
-}
-
 export function TimelineWorkspace() {
   const { 
     timelines, tiles, 
@@ -18,12 +14,17 @@ export function TimelineWorkspace() {
   } = useAppStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  const tilesRef = useRef(tiles);
+  tilesRef.current = tiles;
 
   const rootTimelines = timelines.filter((t) => !t.parentTimelineId);
 
   const createTileMutation = useMutation({
-    mutationFn: (tile: Omit<Tile, "id">) => 
-      apiRequest<Tile>("POST", "/api/tiles", tile),
+    mutationFn: async (tile: Omit<Tile, "id">) => {
+      const response = await apiRequest("POST", "/api/tiles", tile);
+      return response.json() as Promise<Tile>;
+    },
     onSuccess: (newTile) => {
       addTile(newTile);
       queryClient.invalidateQueries({ queryKey: ["/api/tiles"] });
@@ -31,16 +32,20 @@ export function TimelineWorkspace() {
   });
 
   const updateTileMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Tile> }) => 
-      apiRequest<Tile>("PATCH", `/api/tiles/${id}`, updates),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Tile> }) => {
+      const response = await apiRequest("PATCH", `/api/tiles/${id}`, updates);
+      return response.json() as Promise<Tile>;
+    },
     onSuccess: (updatedTile) => {
       updateTile(updatedTile.id, updatedTile);
     },
   });
 
   const createTimelineMutation = useMutation({
-    mutationFn: (timeline: Omit<Timeline, "id">) => 
-      apiRequest<Timeline>("POST", "/api/timelines", timeline),
+    mutationFn: async (timeline: Omit<Timeline, "id">) => {
+      const response = await apiRequest("POST", "/api/timelines", timeline);
+      return response.json() as Promise<Timeline>;
+    },
     onSuccess: (newTimeline) => {
       addTimeline(newTimeline);
       queryClient.invalidateQueries({ queryKey: ["/api/timelines"] });
@@ -59,6 +64,129 @@ export function TimelineWorkspace() {
   const deleteTileMutation = useMutation({
     mutationFn: (id: string) => 
       apiRequest("DELETE", `/api/tiles/${id}`),
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async (tileId: string) => {
+      const currentTiles = tilesRef.current;
+      const tile = currentTiles.find((t) => t.id === tileId);
+      if (!tile) throw new Error("Tile not found");
+      
+      updateTile(tileId, { isGenerating: true });
+      
+      const response = await apiRequest("POST", `/api/generate/${tile.type}`, {
+        prompt: tile.prompt,
+        provider: tile.provider,
+        tileId,
+        initialFrame: tile.mediaUrl,
+      });
+      
+      const result = await response.json() as { mediaUrl: string };
+      return { tileId, result, tile };
+    },
+    onSuccess: ({ tileId, result, tile }) => {
+      const newMediaUrl = result.mediaUrl || `https://picsum.photos/seed/${tileId}/400/300`;
+      const currentTiles = tilesRef.current;
+      
+      updateTile(tileId, { 
+        isGenerating: false, 
+        mediaUrl: newMediaUrl,
+      });
+      
+      updateTileMutation.mutate({ 
+        id: tileId, 
+        updates: { isGenerating: false, mediaUrl: newMediaUrl } 
+      });
+
+      if (tile.type === "image") {
+        const videoTiles = currentTiles.filter(
+          (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
+        );
+        
+        videoTiles.forEach((videoTile) => {
+          updateTile(videoTile.id, { mediaUrl: newMediaUrl });
+          updateTileMutation.mutate({ 
+            id: videoTile.id, 
+            updates: { mediaUrl: newMediaUrl } 
+          });
+          
+          if (videoTile.prompt && !videoTile.isGenerating) {
+            setTimeout(() => {
+              generateMutation.mutate(videoTile.id);
+            }, 200);
+          }
+        });
+      }
+
+      if (tile.type === "video") {
+        const nextImageTiles = currentTiles.filter(
+          (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
+        );
+        
+        nextImageTiles.forEach((imageTile) => {
+          const framePercent = 100;
+          const frameBasedUrl = `${newMediaUrl}?frame=${framePercent}`;
+          
+          updateTile(imageTile.id, { 
+            mediaUrl: frameBasedUrl,
+            selectedFrame: framePercent
+          });
+          updateTileMutation.mutate({ 
+            id: imageTile.id, 
+            updates: { 
+              mediaUrl: frameBasedUrl,
+              selectedFrame: framePercent
+            } 
+          });
+        });
+      }
+
+      toast({
+        title: "Generation complete",
+        description: "Your content has been generated",
+      });
+    },
+    onError: (error, tileId) => {
+      const placeholderUrl = `https://picsum.photos/seed/${tileId}/400/300`;
+      const currentTiles = tilesRef.current;
+      const tile = currentTiles.find((t) => t.id === tileId);
+      
+      updateTile(tileId, { 
+        isGenerating: false,
+        mediaUrl: placeholderUrl,
+      });
+      updateTileMutation.mutate({ 
+        id: tileId, 
+        updates: { isGenerating: false, mediaUrl: placeholderUrl } 
+      });
+      
+      if (tile) {
+        if (tile.type === "image") {
+          const videoTiles = currentTiles.filter(
+            (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
+          );
+          videoTiles.forEach((videoTile) => {
+            updateTile(videoTile.id, { mediaUrl: placeholderUrl });
+            updateTileMutation.mutate({ id: videoTile.id, updates: { mediaUrl: placeholderUrl } });
+          });
+        }
+        if (tile.type === "video") {
+          const nextImageTiles = currentTiles.filter(
+            (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
+          );
+          nextImageTiles.forEach((imageTile) => {
+            const frameBasedUrl = `${placeholderUrl}?frame=100`;
+            updateTile(imageTile.id, { mediaUrl: frameBasedUrl, selectedFrame: 100 });
+            updateTileMutation.mutate({ id: imageTile.id, updates: { mediaUrl: frameBasedUrl, selectedFrame: 100 } });
+          });
+        }
+      }
+      
+      toast({
+        title: "Generation complete",
+        description: "Placeholder content added for demo",
+      });
+    },
   });
 
   const handleInsertTile = useCallback(
@@ -83,7 +211,7 @@ export function TimelineWorkspace() {
           (t) => t.type === "video" && t.timelineId === timelineId && t.position === position - 1
         );
         if (videoTiles.length > 0 && videoTiles[0].mediaUrl) {
-          chainedMediaUrl = videoTiles[0].mediaUrl;
+          chainedMediaUrl = `${videoTiles[0].mediaUrl}?frame=100`;
         }
       } else if (type === "video") {
         const imageTiles = tiles.filter(
@@ -99,7 +227,7 @@ export function TimelineWorkspace() {
         timelineId,
         position,
         prompt: "",
-        selectedFrame: 0,
+        selectedFrame: type === "image" ? 100 : 0,
         isGenerating: false,
         mediaUrl: chainedMediaUrl,
       };
@@ -198,84 +326,49 @@ export function TimelineWorkspace() {
     [tiles, timelines, createTimelineMutation, createTileMutation, toast]
   );
 
-  const generateMutation = useMutation({
-    mutationFn: async (tileId: string) => {
-      const tile = tiles.find((t) => t.id === tileId);
-      if (!tile) throw new Error("Tile not found");
-      
-      updateTile(tileId, { isGenerating: true });
-      
-      const response = await apiRequest<{ mediaUrl: string }>("POST", `/api/generate/${tile.type}`, {
-        prompt: tile.prompt,
-        provider: tile.provider,
-        tileId,
-      });
-      
-      return { tileId, result: response, tile };
-    },
-    onSuccess: ({ tileId, result, tile }) => {
-      const newMediaUrl = result.mediaUrl || `https://picsum.photos/seed/${tileId}/400/300`;
-      updateTile(tileId, { 
-        isGenerating: false, 
-        mediaUrl: newMediaUrl,
-      });
-      
-      updateTileMutation.mutate({ 
-        id: tileId, 
-        updates: { isGenerating: false, mediaUrl: newMediaUrl } 
-      });
-
-      if (tile.type === "image") {
-        const videoTiles = tiles.filter(
-          (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
-        );
-        videoTiles.forEach((vt) => {
-          if (!vt.mediaUrl) {
-            updateTile(vt.id, { mediaUrl: newMediaUrl });
-            updateTileMutation.mutate({ id: vt.id, updates: { mediaUrl: newMediaUrl } });
-          }
-        });
-      }
-
-      if (tile.type === "video") {
-        const nextImageTiles = tiles.filter(
-          (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
-        );
-        nextImageTiles.forEach((it) => {
-          if (!it.mediaUrl) {
-            updateTile(it.id, { mediaUrl: newMediaUrl });
-            updateTileMutation.mutate({ id: it.id, updates: { mediaUrl: newMediaUrl } });
-          }
-        });
-      }
-
-      toast({
-        title: "Generation complete",
-        description: "Your content has been generated",
-      });
-    },
-    onError: (error, tileId) => {
-      const placeholderUrl = `https://picsum.photos/seed/${tileId}/400/300`;
-      updateTile(tileId, { 
-        isGenerating: false,
-        mediaUrl: placeholderUrl,
-      });
-      updateTileMutation.mutate({ 
-        id: tileId, 
-        updates: { isGenerating: false, mediaUrl: placeholderUrl } 
-      });
-      toast({
-        title: "Generation complete",
-        description: "Placeholder content added for demo",
-      });
-    },
-  });
-
   const handleGenerate = useCallback(
     (tileId: string) => {
       generateMutation.mutate(tileId);
     },
     [generateMutation]
+  );
+
+  const handleFrameSliderChange = useCallback(
+    (tileId: string, framePercent: number, previousVideoUrl: string) => {
+      const tile = tiles.find((t) => t.id === tileId);
+      if (!tile) return;
+
+      const cleanVideoUrl = previousVideoUrl.split('?')[0];
+      const frameBasedUrl = `${cleanVideoUrl}?frame=${framePercent}`;
+      
+      updateTile(tileId, { 
+        selectedFrame: framePercent, 
+        mediaUrl: frameBasedUrl 
+      });
+      
+      updateTileMutation.mutate({ 
+        id: tileId, 
+        updates: { selectedFrame: framePercent, mediaUrl: frameBasedUrl } 
+      });
+
+      const videoTiles = tiles.filter(
+        (t) => t.type === "video" && t.timelineId === tile.timelineId && t.position === tile.position
+      );
+      videoTiles.forEach((vt) => {
+        updateTile(vt.id, { mediaUrl: frameBasedUrl });
+        updateTileMutation.mutate({ id: vt.id, updates: { mediaUrl: frameBasedUrl } });
+      });
+
+      const nextImageTiles = tiles.filter(
+        (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
+      );
+      nextImageTiles.forEach((nextTile) => {
+        const nextFrameUrl = `${cleanVideoUrl}?frame=${nextTile.selectedFrame || 100}`;
+        updateTile(nextTile.id, { mediaUrl: nextFrameUrl });
+        updateTileMutation.mutate({ id: nextTile.id, updates: { mediaUrl: nextFrameUrl } });
+      });
+    },
+    [tiles, updateTile, updateTileMutation]
   );
 
   const handleDeleteTimeline = useCallback(
@@ -330,6 +423,7 @@ export function TimelineWorkspace() {
               onBranchDown={handleBranchDown}
               onGenerate={handleGenerate}
               onDeleteTimeline={handleDeleteTimeline}
+              onFrameSliderChange={handleFrameSliderChange}
             />
           ))
         )}

@@ -15,6 +15,7 @@ interface TimelineBranchProps {
   onBranchDown: (tileId: string) => void;
   onGenerate: (tileId: string) => void;
   onDeleteTimeline: (timelineId: string) => void;
+  onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
 }
 
 export function TimelineBranch({
@@ -28,6 +29,7 @@ export function TimelineBranch({
   onBranchDown,
   onGenerate,
   onDeleteTimeline,
+  onFrameSliderChange,
 }: TimelineBranchProps) {
   const { updateTimeline } = useAppStore();
 
@@ -95,6 +97,7 @@ export function TimelineBranch({
                 onBranchUp={onBranchUp}
                 onBranchDown={onBranchDown}
                 onGenerate={onGenerate}
+                onFrameSliderChange={onFrameSliderChange}
               />
             </div>
             <div>
@@ -110,6 +113,7 @@ export function TimelineBranch({
                 onBranchUp={onBranchUp}
                 onBranchDown={onBranchDown}
                 onGenerate={onGenerate}
+                onFrameSliderChange={onFrameSliderChange}
               />
             </div>
           </div>
@@ -129,6 +133,7 @@ export function TimelineBranch({
               onBranchDown={onBranchDown}
               onGenerate={onGenerate}
               onDeleteTimeline={onDeleteTimeline}
+              onFrameSliderChange={onFrameSliderChange}
             />
           ))}
         </>

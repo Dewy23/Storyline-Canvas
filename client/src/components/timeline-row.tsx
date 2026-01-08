@@ -11,6 +11,7 @@ interface TimelineRowProps {
   onBranchUp: (tileId: string) => void;
   onBranchDown: (tileId: string) => void;
   onGenerate: (tileId: string) => void;
+  onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
 }
 
 export function TimelineRow({
@@ -22,6 +23,7 @@ export function TimelineRow({
   onBranchUp,
   onBranchDown,
   onGenerate,
+  onFrameSliderChange,
 }: TimelineRowProps) {
   const filteredTiles = tiles
     .filter((t) => t.type === type && t.timelineId === timeline.id)
@@ -63,6 +65,7 @@ export function TimelineRow({
                 showBranchUp={type === "image"}
                 showBranchDown={type === "video"}
                 previousVideoTile={getPreviousVideoTile(tile)}
+                onFrameSliderChange={onFrameSliderChange}
               />
               <InsertButton
                 onClick={() => onInsertTile(index + 1)}

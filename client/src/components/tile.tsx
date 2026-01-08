@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
 import type { Tile as TileType, AIProvider } from "@shared/schema";
-import { aiProviders } from "@shared/schema";
 
 interface TileProps {
   tile: TileType;
@@ -20,6 +19,7 @@ interface TileProps {
   showBranchUp?: boolean;
   showBranchDown?: boolean;
   previousVideoTile?: TileType;
+  onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
 }
 
 const providerLabels: Record<AIProvider, string> = {
@@ -43,9 +43,10 @@ export function Tile({
   showBranchUp = true,
   showBranchDown = true,
   previousVideoTile,
+  onFrameSliderChange,
 }: TileProps) {
   const [activeTab, setActiveTab] = useState<"view" | "prompt">("view");
-  const { updateTile, selectedTileId, setSelectedTileId, tiles } = useAppStore();
+  const { updateTile, selectedTileId, setSelectedTileId } = useAppStore();
   const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
   const providers = tile.type === "image" ? imageProviders : videoProviders;
@@ -67,8 +68,13 @@ export function Tile({
     updateTile(tile.id, { prompt: value });
   };
 
+  const handlePromptBlur = () => {
+    updateTileMutation.mutate({ id: tile.id, updates: { prompt: tile.prompt } });
+  };
+
   const handleProviderChange = (value: string) => {
     updateTile(tile.id, { provider: value as AIProvider });
+    updateTileMutation.mutate({ id: tile.id, updates: { provider: value as AIProvider } });
   };
 
   const handleFrameChange = (value: number[]) => {
@@ -79,9 +85,10 @@ export function Tile({
 
   const handleVideoFrameSelect = (value: number[]) => {
     const framePercent = value[0];
-    updateTile(tile.id, { selectedFrame: framePercent });
     
-    if (previousVideoTile?.mediaUrl) {
+    if (previousVideoTile?.mediaUrl && onFrameSliderChange) {
+      onFrameSliderChange(tile.id, framePercent, previousVideoTile.mediaUrl);
+    } else if (previousVideoTile?.mediaUrl) {
       const frameBasedUrl = `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
       updateTile(tile.id, { mediaUrl: frameBasedUrl, selectedFrame: framePercent });
       updateTileMutation.mutate({ 
@@ -96,7 +103,7 @@ export function Tile({
       return tile.mediaUrl;
     }
     if (hasPreviousVideo && previousVideoTile?.mediaUrl) {
-      const framePercent = tile.selectedFrame || 0;
+      const framePercent = tile.selectedFrame || 100;
       return `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
     }
     return null;
@@ -172,7 +179,7 @@ export function Tile({
             
             {tile.type === "image" && tile.mediaUrl && !hasPreviousVideo && (
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>Frame</span>
                   <span>{tile.selectedFrame}%</span>
                 </div>
@@ -194,6 +201,7 @@ export function Tile({
               placeholder={`Describe the ${tile.type} you want to generate...`}
               value={tile.prompt}
               onChange={(e) => handlePromptChange(e.target.value)}
+              onBlur={handlePromptBlur}
               className="flex-1 min-h-[80px] text-xs resize-none"
               data-testid={`textarea-prompt-${tile.id}`}
             />
@@ -235,7 +243,7 @@ export function Tile({
 
       {hasPreviousVideo && (
         <div className="w-48 mt-2 px-1 space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>Video Frame</span>
             <span>{tile.selectedFrame}%</span>
           </div>
