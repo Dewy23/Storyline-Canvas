@@ -78,6 +78,20 @@ export function TimelineWorkspace() {
       
       if (prevTile?.mediaUrl) {
         chainedMediaUrl = prevTile.mediaUrl;
+      } else if (type === "image") {
+        const videoTiles = tiles.filter(
+          (t) => t.type === "video" && t.timelineId === timelineId && t.position === position - 1
+        );
+        if (videoTiles.length > 0 && videoTiles[0].mediaUrl) {
+          chainedMediaUrl = videoTiles[0].mediaUrl;
+        }
+      } else if (type === "video") {
+        const imageTiles = tiles.filter(
+          (t) => t.type === "image" && t.timelineId === timelineId && t.position === position
+        );
+        if (imageTiles.length > 0 && imageTiles[0].mediaUrl) {
+          chainedMediaUrl = imageTiles[0].mediaUrl;
+        }
       }
 
       const newTile: Omit<Tile, "id"> = {
@@ -87,14 +101,14 @@ export function TimelineWorkspace() {
         prompt: "",
         selectedFrame: 0,
         isGenerating: false,
-        mediaUrl: type === "video" ? chainedMediaUrl : undefined,
+        mediaUrl: chainedMediaUrl,
       };
       
       createTileMutation.mutate(newTile);
 
       toast({
         title: `${type === "image" ? "Image" : "Video"} tile added`,
-        description: prevTile?.mediaUrl 
+        description: chainedMediaUrl 
           ? "Chained from previous tile's frame" 
           : "Click on the tile to edit the prompt",
       });
@@ -219,6 +233,18 @@ export function TimelineWorkspace() {
           if (!vt.mediaUrl) {
             updateTile(vt.id, { mediaUrl: newMediaUrl });
             updateTileMutation.mutate({ id: vt.id, updates: { mediaUrl: newMediaUrl } });
+          }
+        });
+      }
+
+      if (tile.type === "video") {
+        const nextImageTiles = tiles.filter(
+          (t) => t.type === "image" && t.timelineId === tile.timelineId && t.position === tile.position + 1
+        );
+        nextImageTiles.forEach((it) => {
+          if (!it.mediaUrl) {
+            updateTile(it.id, { mediaUrl: newMediaUrl });
+            updateTileMutation.mutate({ id: it.id, updates: { mediaUrl: newMediaUrl } });
           }
         });
       }
