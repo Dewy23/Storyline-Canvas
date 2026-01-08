@@ -1,37 +1,228 @@
-import { type User, type InsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import type {
+  Tile,
+  InsertTile,
+  Timeline,
+  InsertTimeline,
+  AudioTrack,
+  InsertAudioTrack,
+  AudioClip,
+  InsertAudioClip,
+  APISetting,
+  InsertAPISetting,
+} from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // Timelines
+  getTimelines(): Promise<Timeline[]>;
+  getTimeline(id: string): Promise<Timeline | undefined>;
+  createTimeline(timeline: InsertTimeline): Promise<Timeline>;
+  updateTimeline(id: string, updates: Partial<Timeline>): Promise<Timeline | undefined>;
+  deleteTimeline(id: string): Promise<boolean>;
+
+  // Tiles
+  getTiles(): Promise<Tile[]>;
+  getTilesByTimeline(timelineId: string): Promise<Tile[]>;
+  getTile(id: string): Promise<Tile | undefined>;
+  createTile(tile: InsertTile): Promise<Tile>;
+  updateTile(id: string, updates: Partial<Tile>): Promise<Tile | undefined>;
+  deleteTile(id: string): Promise<boolean>;
+
+  // Audio Tracks
+  getAudioTracks(): Promise<AudioTrack[]>;
+  getAudioTrack(id: string): Promise<AudioTrack | undefined>;
+  createAudioTrack(track: InsertAudioTrack): Promise<AudioTrack>;
+  updateAudioTrack(id: string, updates: Partial<AudioTrack>): Promise<AudioTrack | undefined>;
+  deleteAudioTrack(id: string): Promise<boolean>;
+
+  // Audio Clips
+  getAudioClips(): Promise<AudioClip[]>;
+  getAudioClipsByTrack(trackId: string): Promise<AudioClip[]>;
+  getAudioClip(id: string): Promise<AudioClip | undefined>;
+  createAudioClip(clip: InsertAudioClip): Promise<AudioClip>;
+  updateAudioClip(id: string, updates: Partial<AudioClip>): Promise<AudioClip | undefined>;
+  deleteAudioClip(id: string): Promise<boolean>;
+
+  // API Settings
+  getApiSettings(): Promise<APISetting[]>;
+  getApiSetting(provider: string): Promise<APISetting | undefined>;
+  saveApiSetting(setting: InsertAPISetting): Promise<APISetting>;
+  deleteApiSetting(provider: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private timelines: Map<string, Timeline>;
+  private tiles: Map<string, Tile>;
+  private audioTracks: Map<string, AudioTrack>;
+  private audioClips: Map<string, AudioClip>;
+  private apiSettings: Map<string, APISetting>;
 
   constructor() {
-    this.users = new Map();
+    this.timelines = new Map();
+    this.tiles = new Map();
+    this.audioTracks = new Map();
+    this.audioClips = new Map();
+    this.apiSettings = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  // Timelines
+  async getTimelines(): Promise<Timeline[]> {
+    return Array.from(this.timelines.values());
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getTimeline(id: string): Promise<Timeline | undefined> {
+    return this.timelines.get(id);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createTimeline(insertTimeline: InsertTimeline): Promise<Timeline> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const timeline: Timeline = { ...insertTimeline, id };
+    this.timelines.set(id, timeline);
+    return timeline;
+  }
+
+  async updateTimeline(id: string, updates: Partial<Timeline>): Promise<Timeline | undefined> {
+    const existing = this.timelines.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.timelines.set(id, updated);
+    return updated;
+  }
+
+  async deleteTimeline(id: string): Promise<boolean> {
+    return this.timelines.delete(id);
+  }
+
+  // Tiles
+  async getTiles(): Promise<Tile[]> {
+    return Array.from(this.tiles.values());
+  }
+
+  async getTilesByTimeline(timelineId: string): Promise<Tile[]> {
+    return Array.from(this.tiles.values()).filter((t) => t.timelineId === timelineId);
+  }
+
+  async getTile(id: string): Promise<Tile | undefined> {
+    return this.tiles.get(id);
+  }
+
+  async createTile(insertTile: InsertTile): Promise<Tile> {
+    const id = randomUUID();
+    const tile: Tile = { ...insertTile, id };
+    this.tiles.set(id, tile);
+    return tile;
+  }
+
+  async updateTile(id: string, updates: Partial<Tile>): Promise<Tile | undefined> {
+    const existing = this.tiles.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.tiles.set(id, updated);
+    return updated;
+  }
+
+  async deleteTile(id: string): Promise<boolean> {
+    return this.tiles.delete(id);
+  }
+
+  // Audio Tracks
+  async getAudioTracks(): Promise<AudioTrack[]> {
+    return Array.from(this.audioTracks.values());
+  }
+
+  async getAudioTrack(id: string): Promise<AudioTrack | undefined> {
+    return this.audioTracks.get(id);
+  }
+
+  async createAudioTrack(insertTrack: InsertAudioTrack): Promise<AudioTrack> {
+    const id = randomUUID();
+    const track: AudioTrack = { ...insertTrack, id };
+    this.audioTracks.set(id, track);
+    return track;
+  }
+
+  async updateAudioTrack(id: string, updates: Partial<AudioTrack>): Promise<AudioTrack | undefined> {
+    const existing = this.audioTracks.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.audioTracks.set(id, updated);
+    return updated;
+  }
+
+  async deleteAudioTrack(id: string): Promise<boolean> {
+    return this.audioTracks.delete(id);
+  }
+
+  // Audio Clips
+  async getAudioClips(): Promise<AudioClip[]> {
+    return Array.from(this.audioClips.values());
+  }
+
+  async getAudioClipsByTrack(trackId: string): Promise<AudioClip[]> {
+    return Array.from(this.audioClips.values()).filter((c) => c.trackId === trackId);
+  }
+
+  async getAudioClip(id: string): Promise<AudioClip | undefined> {
+    return this.audioClips.get(id);
+  }
+
+  async createAudioClip(insertClip: InsertAudioClip): Promise<AudioClip> {
+    const id = randomUUID();
+    const clip: AudioClip = { ...insertClip, id };
+    this.audioClips.set(id, clip);
+    return clip;
+  }
+
+  async updateAudioClip(id: string, updates: Partial<AudioClip>): Promise<AudioClip | undefined> {
+    const existing = this.audioClips.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.audioClips.set(id, updated);
+    return updated;
+  }
+
+  async deleteAudioClip(id: string): Promise<boolean> {
+    return this.audioClips.delete(id);
+  }
+
+  // API Settings
+  async getApiSettings(): Promise<APISetting[]> {
+    return Array.from(this.apiSettings.values());
+  }
+
+  async getApiSetting(provider: string): Promise<APISetting | undefined> {
+    return Array.from(this.apiSettings.values()).find((s) => s.provider === provider);
+  }
+
+  async saveApiSetting(insertSetting: InsertAPISetting): Promise<APISetting> {
+    const existing = Array.from(this.apiSettings.values()).find(
+      (s) => s.provider === insertSetting.provider
+    );
+    
+    if (existing) {
+      const updated: APISetting = { 
+        ...existing, 
+        ...insertSetting, 
+        isConnected: insertSetting.apiKey ? true : false 
+      };
+      this.apiSettings.set(existing.id, updated);
+      return updated;
+    }
+
+    const id = randomUUID();
+    const setting: APISetting = { 
+      ...insertSetting, 
+      id, 
+      isConnected: insertSetting.apiKey ? true : false 
+    };
+    this.apiSettings.set(id, setting);
+    return setting;
+  }
+
+  async deleteApiSetting(provider: string): Promise<boolean> {
+    const setting = Array.from(this.apiSettings.values()).find((s) => s.provider === provider);
+    if (!setting) return false;
+    return this.apiSettings.delete(setting.id);
   }
 }
 
