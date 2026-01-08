@@ -4,6 +4,15 @@
 
 StoryForge AI is an AI-powered video editor focused on consistent character storytelling. The application provides a professional creative tool interface with branching timelines, AI-generated images and videos, and audio track management. Users can create visual stories by arranging image and video tiles on timelines, generate content using various AI providers (Stability AI, Runway, Kling, Flux, OpenAI, Replicate, ElevenLabs), and manage audio tracks for voice, music, and sound effects.
 
+## Recent Changes (January 2026)
+
+- Completed full frontend-backend integration with React Query for data persistence
+- Implemented bi-directional automatic chaining between image and video tiles
+- Added API key management with backend persistence (masked display for security)
+- Built audio workspace with DAW-style interface, track management, and preview player
+- Created smart export modal with timeline selection and audio inclusion options
+- All data persists through page reloads via REST API endpoints
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
