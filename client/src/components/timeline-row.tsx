@@ -5,6 +5,7 @@ import type { Tile as TileType, Timeline } from "@shared/schema";
 interface TimelineRowProps {
   timeline: Timeline;
   tiles: TileType[];
+  allTiles?: TileType[];
   type: "image" | "video";
   onInsertTile: (position: number) => void;
   onBranchUp: (tileId: string) => void;
@@ -15,6 +16,7 @@ interface TimelineRowProps {
 export function TimelineRow({
   timeline,
   tiles,
+  allTiles = tiles,
   type,
   onInsertTile,
   onBranchUp,
@@ -25,10 +27,19 @@ export function TimelineRow({
     .filter((t) => t.type === type && t.timelineId === timeline.id)
     .sort((a, b) => a.position - b.position);
 
+  const videoTiles = allTiles
+    .filter((t) => t.type === "video" && t.timelineId === timeline.id)
+    .sort((a, b) => a.position - b.position);
+
+  const getPreviousVideoTile = (imageTile: TileType): TileType | undefined => {
+    if (imageTile.type !== "image") return undefined;
+    return videoTiles.find((vt) => vt.position === imageTile.position - 1);
+  };
+
   return (
-    <div className="flex items-stretch gap-1 min-h-[180px]">
+    <div className="flex items-start gap-1 min-h-[180px]">
       {filteredTiles.length === 0 ? (
-        <div className="flex items-center justify-center w-full">
+        <div className="flex items-center justify-center w-full min-h-[180px]">
           <InsertButton
             onClick={() => onInsertTile(0)}
             testId={`button-insert-first-${type}-${timeline.id}`}
@@ -36,12 +47,14 @@ export function TimelineRow({
         </div>
       ) : (
         <>
-          <InsertButton
-            onClick={() => onInsertTile(0)}
-            testId={`button-insert-start-${type}-${timeline.id}`}
-          />
+          <div className="flex items-start min-h-[180px]">
+            <InsertButton
+              onClick={() => onInsertTile(0)}
+              testId={`button-insert-start-${type}-${timeline.id}`}
+            />
+          </div>
           {filteredTiles.map((tile, index) => (
-            <div key={tile.id} className="flex items-stretch">
+            <div key={tile.id} className="flex items-start">
               <Tile
                 tile={tile}
                 onBranchUp={() => onBranchUp(tile.id)}
@@ -49,6 +62,7 @@ export function TimelineRow({
                 onGenerate={() => onGenerate(tile.id)}
                 showBranchUp={type === "image"}
                 showBranchDown={type === "video"}
+                previousVideoTile={getPreviousVideoTile(tile)}
               />
               <InsertButton
                 onClick={() => onInsertTile(index + 1)}

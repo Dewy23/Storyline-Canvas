@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { useAppStore } from "@/lib/store";
+import { apiRequest } from "@/lib/queryClient";
 import type { Tile as TileType, AIProvider } from "@shared/schema";
 import { aiProviders } from "@shared/schema";
 
@@ -17,6 +19,7 @@ interface TileProps {
   onGenerate: () => void;
   showBranchUp?: boolean;
   showBranchDown?: boolean;
+  previousVideoTile?: TileType;
 }
 
 const providerLabels: Record<AIProvider, string> = {
@@ -39,11 +42,26 @@ export function Tile({
   onGenerate,
   showBranchUp = true,
   showBranchDown = true,
+  previousVideoTile,
 }: TileProps) {
   const [activeTab, setActiveTab] = useState<"view" | "prompt">("view");
-  const { updateTile, selectedTileId, setSelectedTileId } = useAppStore();
+  const { updateTile, selectedTileId, setSelectedTileId, tiles } = useAppStore();
+  const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
   const providers = tile.type === "image" ? imageProviders : videoProviders;
+
+  const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
+  
+  const updateTileMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<TileType> }) => {
+      const response = await apiRequest("PATCH", `/api/tiles/${id}`, updates);
+      return response.json() as Promise<TileType>;
+    },
+    onSuccess: (updatedTile) => {
+      updateTile(updatedTile.id, updatedTile);
+      queryClient.invalidateQueries({ queryKey: ["/api/tiles"] });
+    },
+  });
 
   const handlePromptChange = (value: string) => {
     updateTile(tile.id, { prompt: value });
@@ -54,11 +72,40 @@ export function Tile({
   };
 
   const handleFrameChange = (value: number[]) => {
-    updateTile(tile.id, { selectedFrame: value[0] });
+    const frameValue = value[0];
+    updateTile(tile.id, { selectedFrame: frameValue });
+    updateTileMutation.mutate({ id: tile.id, updates: { selectedFrame: frameValue } });
   };
 
+  const handleVideoFrameSelect = (value: number[]) => {
+    const framePercent = value[0];
+    updateTile(tile.id, { selectedFrame: framePercent });
+    
+    if (previousVideoTile?.mediaUrl) {
+      const frameBasedUrl = `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
+      updateTile(tile.id, { mediaUrl: frameBasedUrl, selectedFrame: framePercent });
+      updateTileMutation.mutate({ 
+        id: tile.id, 
+        updates: { mediaUrl: frameBasedUrl, selectedFrame: framePercent } 
+      });
+    }
+  };
+
+  const getPreviewImage = () => {
+    if (tile.mediaUrl) {
+      return tile.mediaUrl;
+    }
+    if (hasPreviousVideo && previousVideoTile?.mediaUrl) {
+      const framePercent = tile.selectedFrame || 0;
+      return `${previousVideoTile.mediaUrl}?frame=${framePercent}`;
+    }
+    return null;
+  };
+
+  const previewImage = getPreviewImage();
+
   return (
-    <div className="relative group">
+    <div className="relative group flex flex-col">
       {showBranchUp && tile.type === "image" && (
         <Button
           variant="ghost"
@@ -91,17 +138,17 @@ export function Tile({
 
           <TabsContent value="view" className="flex-1 m-0 p-2 flex flex-col gap-2">
             <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden relative">
-              {tile.mediaUrl ? (
+              {previewImage ? (
                 tile.type === "image" ? (
                   <img
-                    src={tile.mediaUrl}
+                    src={previewImage}
                     alt="Generated"
                     className="w-full h-full object-cover"
                     data-testid={`preview-image-${tile.id}`}
                   />
                 ) : (
                   <video
-                    src={tile.mediaUrl}
+                    src={previewImage}
                     className="w-full h-full object-cover"
                     controls={false}
                     data-testid={`preview-video-${tile.id}`}
@@ -123,7 +170,7 @@ export function Tile({
               )}
             </div>
             
-            {tile.type === "image" && tile.mediaUrl && (
+            {tile.type === "image" && tile.mediaUrl && !hasPreviousVideo && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Frame</span>
@@ -185,6 +232,24 @@ export function Tile({
           </TabsContent>
         </Tabs>
       </Card>
+
+      {hasPreviousVideo && (
+        <div className="w-48 mt-2 px-1 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Video Frame</span>
+            <span>{tile.selectedFrame}%</span>
+          </div>
+          <Slider
+            value={[tile.selectedFrame]}
+            onValueChange={handleVideoFrameSelect}
+            min={0}
+            max={100}
+            step={1}
+            className="w-full"
+            data-testid={`slider-video-frame-${tile.id}`}
+          />
+        </div>
+      )}
 
       {showBranchDown && tile.type === "video" && (
         <Button

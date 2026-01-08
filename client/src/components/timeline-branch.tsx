@@ -89,6 +89,7 @@ export function TimelineBranch({
               <TimelineRow
                 timeline={timeline}
                 tiles={tiles}
+                allTiles={tiles}
                 type="image"
                 onInsertTile={(pos) => onInsertTile(timeline.id, "image", pos)}
                 onBranchUp={onBranchUp}
@@ -103,6 +104,7 @@ export function TimelineBranch({
               <TimelineRow
                 timeline={timeline}
                 tiles={tiles}
+                allTiles={tiles}
                 type="video"
                 onInsertTile={(pos) => onInsertTile(timeline.id, "video", pos)}
                 onBranchUp={onBranchUp}
