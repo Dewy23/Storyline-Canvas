@@ -9,6 +9,10 @@ export const aiProviders = [
   "elevenlabs",
   "openai",
   "replicate",
+  "ideogram",
+  "dalle3",
+  "pika",
+  "luma",
 ] as const;
 
 export type AIProvider = (typeof aiProviders)[number];

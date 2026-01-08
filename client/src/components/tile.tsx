@@ -24,17 +24,21 @@ interface TileProps {
 }
 
 const providerLabels: Record<AIProvider, string> = {
+  flux: "Flux",
   stability: "Stability AI",
+  dalle3: "DALL·E 3",
+  ideogram: "Ideogram",
   runway: "Runway",
   kling: "Kling",
-  flux: "Flux",
+  pika: "Pika",
+  luma: "Luma Dream Machine",
   elevenlabs: "ElevenLabs",
   openai: "OpenAI",
   replicate: "Replicate",
 };
 
-const imageProviders: AIProvider[] = ["stability", "flux", "openai", "replicate"];
-const videoProviders: AIProvider[] = ["runway", "kling", "replicate"];
+const imageProviders: AIProvider[] = ["flux", "stability", "dalle3", "ideogram"];
+const videoProviders: AIProvider[] = ["runway", "kling", "pika", "luma"];
 
 export function Tile({
   tile,
@@ -255,14 +259,6 @@ export function Tile({
             </TabsContent>
 
             <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
-              <Textarea
-                placeholder={`Describe the ${tile.type} you want to generate...`}
-                value={tile.prompt}
-                onChange={(e) => handlePromptChange(e.target.value)}
-                onBlur={handlePromptBlur}
-                className="flex-1 min-h-[80px] text-xs resize-none"
-                data-testid={`textarea-prompt-${tile.id}`}
-              />
               <Select
                 value={tile.provider || providers[0]}
                 onValueChange={handleProviderChange}
@@ -278,6 +274,14 @@ export function Tile({
                   ))}
                 </SelectContent>
               </Select>
+              <Textarea
+                placeholder={`Describe the ${tile.type} you want to generate...`}
+                value={tile.prompt}
+                onChange={(e) => handlePromptChange(e.target.value)}
+                onBlur={handlePromptBlur}
+                className="flex-1 min-h-[80px] text-xs resize-none"
+                data-testid={`textarea-prompt-${tile.id}`}
+              />
               <Button
                 size="sm"
                 className="w-full gap-2"

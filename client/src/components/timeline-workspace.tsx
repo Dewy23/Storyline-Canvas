@@ -72,6 +72,9 @@ export function TimelineWorkspace() {
       const tile = currentTiles.find((t) => t.id === tileId);
       if (!tile) throw new Error("Tile not found");
       
+      const provider = tile.provider || (tile.type === "image" ? "flux" : "runway");
+      console.log(`[Generation] Starting ${tile.type} generation with provider: ${provider}`);
+      
       updateTile(tileId, { isGenerating: true });
       
       let referenceFrame: string | undefined;
@@ -87,7 +90,7 @@ export function TimelineWorkspace() {
       
       const response = await apiRequest("POST", `/api/generate/${tile.type}`, {
         prompt: tile.prompt,
-        provider: tile.provider,
+        provider: provider,
         tileId,
         initialFrame: referenceFrame || tile.mediaUrl,
       });

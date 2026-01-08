@@ -240,6 +240,9 @@ export async function registerRoutes(
   app.post("/api/generate/image", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
+      const provider = data.provider || "flux";
+      
+      console.log(`[Generate Image] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
       
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
@@ -248,7 +251,8 @@ export async function registerRoutes(
       res.json({
         success: true,
         mediaUrl: imageUrl,
-        message: "Image generated successfully (placeholder)",
+        provider: provider,
+        message: `Image generated with ${provider} (placeholder)`,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -261,6 +265,9 @@ export async function registerRoutes(
   app.post("/api/generate/video", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
+      const provider = data.provider || "runway";
+      
+      console.log(`[Generate Video] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
       
       await new Promise((resolve) => setTimeout(resolve, 2000));
       
@@ -269,7 +276,8 @@ export async function registerRoutes(
       res.json({
         success: true,
         mediaUrl: videoUrl,
-        message: "Video generated successfully (placeholder - showing image)",
+        provider: provider,
+        message: `Video generated with ${provider} (placeholder - showing image)`,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
