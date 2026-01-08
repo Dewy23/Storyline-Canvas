@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +46,8 @@ export function Tile({
   onFrameSliderChange,
 }: TileProps) {
   const [activeTab, setActiveTab] = useState<"view" | "prompt">("view");
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { updateTile, selectedTileId, setSelectedTileId } = useAppStore();
   const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
@@ -111,166 +113,239 @@ export function Tile({
 
   const previewImage = getPreviewImage();
 
+  const handleFullscreen = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (tile.type === "image") {
+      setIsLightboxOpen(true);
+    } else if (tile.type === "video" && videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+    }
+  }, [tile.type]);
+
+  const handleCloseLightbox = useCallback(() => {
+    setIsLightboxOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isLightboxOpen) {
+        setIsLightboxOpen(false);
+      }
+    };
+    
+    if (isLightboxOpen) {
+      document.addEventListener("keydown", handleEsc);
+      document.body.style.overflow = "hidden";
+    }
+    
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [isLightboxOpen]);
+
   return (
-    <div className="relative group flex flex-col">
-      {showBranchUp && tile.type === "image" && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute -top-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          onClick={onBranchUp}
-          data-testid={`button-branch-up-${tile.id}`}
-          aria-label="Create branch above"
+    <>
+      <div className="relative group flex flex-col">
+        {showBranchUp && tile.type === "image" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -top-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={onBranchUp}
+            data-testid={`button-branch-up-${tile.id}`}
+            aria-label="Create branch above"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </Button>
+        )}
+
+        <Card
+          className={`w-48 flex flex-col cursor-pointer transition-all ${
+            isSelected ? "ring-2 ring-primary" : ""
+          }`}
+          onClick={() => setSelectedTileId(tile.id)}
+          data-testid={`tile-${tile.type}-${tile.id}`}
         >
-          <ChevronUp className="w-4 h-4" />
-        </Button>
-      )}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "view" | "prompt")} className="flex flex-col h-full">
+            <TabsList className="h-8 w-full grid grid-cols-2 shrink-0">
+              <TabsTrigger value="view" className="text-xs" data-testid={`tab-view-${tile.id}`}>
+                View
+              </TabsTrigger>
+              <TabsTrigger value="prompt" className="text-xs" data-testid={`tab-prompt-${tile.id}`}>
+                Prompt
+              </TabsTrigger>
+            </TabsList>
 
-      <Card
-        className={`w-48 flex flex-col cursor-pointer transition-all ${
-          isSelected ? "ring-2 ring-primary" : ""
-        }`}
-        onClick={() => setSelectedTileId(tile.id)}
-        data-testid={`tile-${tile.type}-${tile.id}`}
-      >
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "view" | "prompt")} className="flex flex-col h-full">
-          <TabsList className="h-8 w-full grid grid-cols-2 shrink-0">
-            <TabsTrigger value="view" className="text-xs" data-testid={`tab-view-${tile.id}`}>
-              View
-            </TabsTrigger>
-            <TabsTrigger value="prompt" className="text-xs" data-testid={`tab-prompt-${tile.id}`}>
-              Prompt
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="view" className="flex-1 m-0 p-2 flex flex-col gap-2">
-            <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden relative">
-              {previewImage ? (
-                tile.type === "image" ? (
-                  <img
-                    src={previewImage}
-                    alt="Generated"
-                    className="w-full h-full object-cover"
-                    data-testid={`preview-image-${tile.id}`}
-                  />
-                ) : (
-                  <video
-                    src={previewImage}
-                    className="w-full h-full object-cover"
-                    controls={false}
-                    data-testid={`preview-video-${tile.id}`}
-                  />
-                )
-              ) : (
-                <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                  {tile.isGenerating ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : tile.type === "image" ? (
-                    <Image className="w-6 h-6" />
+            <TabsContent value="view" className="flex-1 m-0 p-2 flex flex-col gap-2">
+              <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden relative group/preview">
+                {previewImage ? (
+                  tile.type === "image" ? (
+                    <img
+                      src={previewImage}
+                      alt="Generated"
+                      className="w-full h-full object-cover"
+                      data-testid={`preview-image-${tile.id}`}
+                    />
                   ) : (
-                    <Video className="w-6 h-6" />
-                  )}
-                  <span className="text-xs">
-                    {tile.isGenerating ? "Generating..." : `No ${tile.type}`}
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            {tile.type === "image" && tile.mediaUrl && !hasPreviousVideo && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>Frame</span>
-                  <span>{tile.selectedFrame}%</span>
-                </div>
-                <Slider
-                  value={[tile.selectedFrame]}
-                  onValueChange={handleFrameChange}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full"
-                  data-testid={`slider-frame-${tile.id}`}
-                />
+                    <video
+                      ref={videoRef}
+                      src={previewImage}
+                      className="w-full h-full object-cover"
+                      controls={false}
+                      data-testid={`preview-video-${tile.id}`}
+                    />
+                  )
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    {tile.isGenerating ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : tile.type === "image" ? (
+                      <Image className="w-6 h-6" />
+                    ) : (
+                      <Video className="w-6 h-6" />
+                    )}
+                    <span className="text-xs">
+                      {tile.isGenerating ? "Generating..." : `No ${tile.type}`}
+                    </span>
+                  </div>
+                )}
+                
+                {previewImage && (
+                  <button
+                    onClick={handleFullscreen}
+                    className="absolute bottom-1 right-1 p-1 rounded bg-black/40 text-white/70 opacity-0 group-hover/preview:opacity-100 hover:text-white hover:bg-black/60 transition-all"
+                    data-testid={`button-fullscreen-${tile.id}`}
+                    aria-label="View fullscreen"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
-            <Textarea
-              placeholder={`Describe the ${tile.type} you want to generate...`}
-              value={tile.prompt}
-              onChange={(e) => handlePromptChange(e.target.value)}
-              onBlur={handlePromptBlur}
-              className="flex-1 min-h-[80px] text-xs resize-none"
-              data-testid={`textarea-prompt-${tile.id}`}
-            />
-            <Select
-              value={tile.provider || providers[0]}
-              onValueChange={handleProviderChange}
-            >
-              <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
-                <SelectValue placeholder="Select provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider} value={provider} className="text-xs">
-                    {providerLabels[provider]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              className="w-full gap-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                onGenerate();
-              }}
-              disabled={tile.isGenerating || !tile.prompt}
-              data-testid={`button-generate-${tile.id}`}
-            >
-              {tile.isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4" />
+              
+              {tile.type === "image" && tile.mediaUrl && !hasPreviousVideo && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>Frame</span>
+                    <span>{tile.selectedFrame}%</span>
+                  </div>
+                  <Slider
+                    value={[tile.selectedFrame]}
+                    onValueChange={handleFrameChange}
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="w-full"
+                    data-testid={`slider-frame-${tile.id}`}
+                  />
+                </div>
               )}
-              Generate
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </Card>
+            </TabsContent>
 
-      {hasPreviousVideo && (
-        <div className="w-48 mt-2 px-1 space-y-1">
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>Video Frame</span>
-            <span>{tile.selectedFrame}%</span>
+            <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
+              <Textarea
+                placeholder={`Describe the ${tile.type} you want to generate...`}
+                value={tile.prompt}
+                onChange={(e) => handlePromptChange(e.target.value)}
+                onBlur={handlePromptBlur}
+                className="flex-1 min-h-[80px] text-xs resize-none"
+                data-testid={`textarea-prompt-${tile.id}`}
+              />
+              <Select
+                value={tile.provider || providers[0]}
+                onValueChange={handleProviderChange}
+              >
+                <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider} value={provider} className="text-xs">
+                      {providerLabels[provider]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                className="w-full gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerate();
+                }}
+                disabled={tile.isGenerating || !tile.prompt}
+                data-testid={`button-generate-${tile.id}`}
+              >
+                {tile.isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wand2 className="w-4 h-4" />
+                )}
+                Generate
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </Card>
+
+        {hasPreviousVideo && (
+          <div className="w-48 mt-2 px-1 space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>Video Frame</span>
+              <span>{tile.selectedFrame}%</span>
+            </div>
+            <Slider
+              value={[tile.selectedFrame]}
+              onValueChange={handleVideoFrameSelect}
+              min={0}
+              max={100}
+              step={1}
+              className="w-full"
+              data-testid={`slider-video-frame-${tile.id}`}
+            />
           </div>
-          <Slider
-            value={[tile.selectedFrame]}
-            onValueChange={handleVideoFrameSelect}
-            min={0}
-            max={100}
-            step={1}
-            className="w-full"
-            data-testid={`slider-video-frame-${tile.id}`}
+        )}
+
+        {showBranchDown && tile.type === "video" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -bottom-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={onBranchDown}
+            data-testid={`button-branch-down-${tile.id}`}
+            aria-label="Create branch below"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      {isLightboxOpen && previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={handleCloseLightbox}
+          data-testid={`lightbox-${tile.id}`}
+        >
+          <button
+            onClick={handleCloseLightbox}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition-all"
+            data-testid={`button-close-lightbox-${tile.id}`}
+            aria-label="Close fullscreen"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <img
+            src={previewImage}
+            alt="Fullscreen view"
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`lightbox-image-${tile.id}`}
           />
         </div>
       )}
-
-      {showBranchDown && tile.type === "video" && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute -bottom-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          onClick={onBranchDown}
-          data-testid={`button-branch-down-${tile.id}`}
-          aria-label="Create branch below"
-        >
-          <ChevronDown className="w-4 h-4" />
-        </Button>
-      )}
-    </div>
+    </>
   );
 }
