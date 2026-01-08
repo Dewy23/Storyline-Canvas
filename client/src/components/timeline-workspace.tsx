@@ -1,10 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TimelineBranch } from "./timeline-branch";
 import { TimelineToolbar } from "./timeline-toolbar";
-import { LinkModal } from "./link-modal";
 import { RenderPreview } from "./render-preview";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,9 +12,8 @@ import type { Tile, Timeline } from "@shared/schema";
 
 export function TimelineWorkspace() {
   const { 
-    timelines, tiles, tileLinks,
+    timelines, tiles,
     addTimeline, addTile, updateTile, removeTimeline, removeTile,
-    setLinkModalOpen, isLinkModalOpen
   } = useAppStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -153,107 +151,6 @@ export function TimelineWorkspace() {
     },
   });
 
-  const handleInsertTile = useCallback(
-    (timelineId: string, type: "image" | "video", position: number) => {
-      const timelineTiles = tiles.filter(
-        (t) => t.timelineId === timelineId && t.type === type
-      );
-      
-      timelineTiles
-        .filter((t) => t.position >= position)
-        .forEach((t) => {
-          updateTileMutation.mutate({ id: t.id, updates: { position: t.position + 1 } });
-        });
-
-      const newTile: Omit<Tile, "id"> = {
-        type,
-        timelineId,
-        position,
-        prompt: "",
-        selectedFrame: 100,
-        isGenerating: false,
-      };
-      
-      createTileMutation.mutate(newTile);
-
-      toast({
-        title: `${type === "image" ? "Image" : "Video"} tile added`,
-        description: "Click on the tile to edit the prompt",
-      });
-    },
-    [tiles, createTileMutation, updateTileMutation, toast]
-  );
-
-  const handleAddTimeline = useCallback(() => {
-    const lastTimeline = timelines[timelines.length - 1];
-    const lastTimelineTiles = lastTimeline 
-      ? tiles.filter((t) => t.timelineId === lastTimeline.id)
-      : [];
-    
-    const newTimeline: Omit<Timeline, "id"> = {
-      name: `Timeline ${timelines.length + 1}`,
-      isCollapsed: false,
-      order: timelines.length,
-    };
-
-    createTimelineMutation.mutate(newTimeline, {
-      onSuccess: (createdTimeline) => {
-        if (lastTimelineTiles.length > 0) {
-          const imageTiles = lastTimelineTiles.filter((t) => t.type === "image");
-          const videoTiles = lastTimelineTiles.filter((t) => t.type === "video");
-          
-          imageTiles.forEach((t) => {
-            const newTile: Omit<Tile, "id"> = {
-              type: "image",
-              timelineId: createdTimeline.id,
-              position: t.position,
-              prompt: t.prompt,
-              selectedFrame: 100,
-              isGenerating: false,
-            };
-            createTileMutation.mutate(newTile);
-          });
-
-          videoTiles.forEach((t) => {
-            const newTile: Omit<Tile, "id"> = {
-              type: "video",
-              timelineId: createdTimeline.id,
-              position: t.position,
-              prompt: t.prompt,
-              selectedFrame: 0,
-              isGenerating: false,
-            };
-            createTileMutation.mutate(newTile);
-          });
-        } else {
-          [0, 1, 2].forEach((pos) => {
-            createTileMutation.mutate({
-              type: "image",
-              timelineId: createdTimeline.id,
-              position: pos,
-              prompt: "",
-              selectedFrame: 0,
-              isGenerating: false,
-            });
-            createTileMutation.mutate({
-              type: "video",
-              timelineId: createdTimeline.id,
-              position: pos,
-              prompt: "",
-              selectedFrame: 0,
-              isGenerating: false,
-            });
-          });
-        }
-      }
-    });
-
-    toast({
-      title: "Timeline added",
-      description: "New timeline created with copied structure",
-    });
-  }, [timelines, tiles, createTimelineMutation, createTileMutation, toast]);
-
   const handleGenerate = useCallback(
     (tileId: string) => {
       generateMutation.mutate(tileId);
@@ -304,6 +201,12 @@ export function TimelineWorkspace() {
 
       <ResizablePanel defaultSize={94} minSize={60}>
         <ResizablePanelGroup direction="vertical">
+          <ResizablePanel defaultSize={25} minSize={15} maxSize={50} collapsible>
+            <RenderPreview />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
           <ResizablePanel defaultSize={75} minSize={30}>
             <ScrollArea className="h-full">
               <div className="min-w-max">
@@ -317,11 +220,9 @@ export function TimelineWorkspace() {
                       key={timeline.id}
                       timeline={timeline}
                       tiles={tiles}
-                      onInsertTile={handleInsertTile}
                       onGenerate={handleGenerate}
                       onDeleteTimeline={handleDeleteTimeline}
                       onFrameSliderChange={handleFrameSliderChange}
-                      tileLinks={tileLinks}
                       isFirst={index === 0}
                     />
                   ))
@@ -330,19 +231,8 @@ export function TimelineWorkspace() {
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <ResizablePanel defaultSize={25} minSize={10} collapsible>
-            <RenderPreview />
-          </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>
-
-      <LinkModal 
-        open={isLinkModalOpen} 
-        onOpenChange={setLinkModalOpen}
-      />
     </ResizablePanelGroup>
   );
 }

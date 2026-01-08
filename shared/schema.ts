@@ -62,7 +62,7 @@ export const timelineSchema = z.object({
 export type Timeline = z.infer<typeof timelineSchema>;
 export type InsertTimeline = Omit<Timeline, "id">;
 
-// Tile Link schema - for linking tiles across timelines
+// Tile Link schema - for linking tiles across timelines (legacy)
 export const tileLinkSchema = z.object({
   id: z.string(),
   tileId: z.string(),
@@ -72,6 +72,17 @@ export const tileLinkSchema = z.object({
 
 export type TileLink = z.infer<typeof tileLinkSchema>;
 export type InsertTileLink = Omit<TileLink, "id">;
+
+// Linked Segment schema - for segment-based linking (image+video grouped)
+export const linkedSegmentSchema = z.object({
+  id: z.string(),
+  timelineId: z.string(),
+  position: z.number(), // segment position in timeline
+  order: z.number(), // position in the linked render sequence
+});
+
+export type LinkedSegment = z.infer<typeof linkedSegmentSchema>;
+export type InsertLinkedSegment = Omit<LinkedSegment, "id">;
 
 // Audio Track schema
 export const audioTrackSchema = z.object({
@@ -135,6 +146,7 @@ export type Project = z.infer<typeof projectSchema>;
 export const insertTileSchema = tileSchema.omit({ id: true });
 export const insertTimelineSchema = timelineSchema.omit({ id: true });
 export const insertTileLinkSchema = tileLinkSchema.omit({ id: true });
+export const insertLinkedSegmentSchema = linkedSegmentSchema.omit({ id: true });
 export const insertAudioTrackSchema = audioTrackSchema.omit({ id: true });
 export const insertAudioClipSchema = audioClipSchema.omit({ id: true });
 export const insertApiSettingSchema = apiSettingSchema.omit({ id: true, isConnected: true });

@@ -5,6 +5,7 @@ import {
   insertTileSchema,
   insertTimelineSchema,
   insertTileLinkSchema,
+  insertLinkedSegmentSchema,
   insertAudioTrackSchema,
   insertAudioClipSchema,
   insertApiSettingSchema,
@@ -135,6 +136,46 @@ export async function registerRoutes(
 
   app.delete("/api/tile-links", async (req, res) => {
     await storage.clearTileLinks();
+    res.status(204).send();
+  });
+
+  // Linked Segments
+  app.get("/api/linked-segments", async (req, res) => {
+    const segments = await storage.getLinkedSegments();
+    res.json(segments);
+  });
+
+  app.post("/api/linked-segments", async (req, res) => {
+    try {
+      const data = insertLinkedSegmentSchema.parse(req.body);
+      const segment = await storage.createLinkedSegment(data);
+      res.status(201).json(segment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/linked-segments/:id", async (req, res) => {
+    const deleted = await storage.deleteLinkedSegment(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Linked segment not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.delete("/api/linked-segments", async (req, res) => {
+    const { timelineId, position } = req.query;
+    if (timelineId && position) {
+      await storage.deleteLinkedSegmentByTimelinePosition(
+        timelineId as string, 
+        parseInt(position as string)
+      );
+    } else {
+      await storage.clearLinkedSegments();
+    }
     res.status(204).send();
   });
 

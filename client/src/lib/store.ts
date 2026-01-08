@@ -51,6 +51,14 @@ interface AppState {
   isLinkModalOpen: boolean;
   setLinkModalOpen: (open: boolean) => void;
   
+  activeTool: "select" | "link";
+  setActiveTool: (tool: "select" | "link") => void;
+  
+  linkedSegments: { id?: string; timelineId: string; position: number; order: number }[];
+  setLinkedSegments: (segments: { id?: string; timelineId: string; position: number; order: number }[]) => void;
+  addLinkedSegment: (segment: { id: string; timelineId: string; position: number; order: number }) => void;
+  removeLinkedSegment: (timelineId: string, position: number) => void;
+  
   playheadPosition: number;
   setPlayheadPosition: (pos: number) => void;
   
@@ -132,6 +140,20 @@ export const useAppStore = create<AppState>((set) => ({
   
   isLinkModalOpen: false,
   setLinkModalOpen: (open) => set({ isLinkModalOpen: open }),
+  
+  activeTool: "select",
+  setActiveTool: (tool) => set({ activeTool: tool }),
+  
+  linkedSegments: [],
+  setLinkedSegments: (segments) => set({ linkedSegments: segments }),
+  addLinkedSegment: (segment) => set((state) => ({
+    linkedSegments: [...state.linkedSegments, segment],
+  })),
+  removeLinkedSegment: (timelineId, position) => set((state) => ({
+    linkedSegments: state.linkedSegments.filter(
+      (s) => !(s.timelineId === timelineId && s.position === position)
+    ),
+  })),
   
   playheadPosition: 0,
   setPlayheadPosition: (pos) => set({ playheadPosition: pos }),

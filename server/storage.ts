@@ -6,6 +6,8 @@ import type {
   InsertTimeline,
   TileLink,
   InsertTileLink,
+  LinkedSegment,
+  InsertLinkedSegment,
   AudioTrack,
   InsertAudioTrack,
   AudioClip,
@@ -30,12 +32,20 @@ export interface IStorage {
   updateTile(id: string, updates: Partial<Tile>): Promise<Tile | undefined>;
   deleteTile(id: string): Promise<boolean>;
 
-  // Tile Links
+  // Tile Links (legacy)
   getTileLinks(): Promise<TileLink[]>;
   getTileLink(id: string): Promise<TileLink | undefined>;
   createTileLink(link: InsertTileLink): Promise<TileLink>;
   deleteTileLink(id: string): Promise<boolean>;
   clearTileLinks(): Promise<boolean>;
+
+  // Linked Segments
+  getLinkedSegments(): Promise<LinkedSegment[]>;
+  getLinkedSegment(id: string): Promise<LinkedSegment | undefined>;
+  createLinkedSegment(segment: InsertLinkedSegment): Promise<LinkedSegment>;
+  deleteLinkedSegment(id: string): Promise<boolean>;
+  deleteLinkedSegmentByTimelinePosition(timelineId: string, position: number): Promise<boolean>;
+  clearLinkedSegments(): Promise<boolean>;
 
   // Audio Tracks
   getAudioTracks(): Promise<AudioTrack[]>;
@@ -63,6 +73,7 @@ export class MemStorage implements IStorage {
   private timelines: Map<string, Timeline>;
   private tiles: Map<string, Tile>;
   private tileLinks: Map<string, TileLink>;
+  private linkedSegments: Map<string, LinkedSegment>;
   private audioTracks: Map<string, AudioTrack>;
   private audioClips: Map<string, AudioClip>;
   private apiSettings: Map<string, APISetting>;
@@ -71,6 +82,7 @@ export class MemStorage implements IStorage {
     this.timelines = new Map();
     this.tiles = new Map();
     this.tileLinks = new Map();
+    this.linkedSegments = new Map();
     this.audioTracks = new Map();
     this.audioClips = new Map();
     this.apiSettings = new Map();
@@ -107,6 +119,10 @@ export class MemStorage implements IStorage {
     const linksToDelete = Array.from(this.tileLinks.values()).filter((l) => l.timelineId === id);
     linksToDelete.forEach((l) => this.tileLinks.delete(l.id));
     
+    const segmentsToDelete = Array.from(this.linkedSegments.values()).filter((s) => s.timelineId === id);
+    segmentsToDelete.forEach((s) => this.linkedSegments.delete(s.id));
+    this.reindexLinkedSegments();
+    
     return this.timelines.delete(id);
   }
 
@@ -139,8 +155,18 @@ export class MemStorage implements IStorage {
   }
 
   async deleteTile(id: string): Promise<boolean> {
+    const tile = this.tiles.get(id);
+    
     const linksToDelete = Array.from(this.tileLinks.values()).filter((l) => l.tileId === id);
     linksToDelete.forEach((l) => this.tileLinks.delete(l.id));
+    
+    if (tile) {
+      const segmentsToDelete = Array.from(this.linkedSegments.values()).filter(
+        (s) => s.timelineId === tile.timelineId && s.position === tile.position
+      );
+      segmentsToDelete.forEach((s) => this.linkedSegments.delete(s.id));
+      this.reindexLinkedSegments();
+    }
     
     return this.tiles.delete(id);
   }
@@ -167,6 +193,58 @@ export class MemStorage implements IStorage {
 
   async clearTileLinks(): Promise<boolean> {
     this.tileLinks.clear();
+    return true;
+  }
+
+  // Linked Segments
+  async getLinkedSegments(): Promise<LinkedSegment[]> {
+    return Array.from(this.linkedSegments.values()).sort((a, b) => a.order - b.order);
+  }
+
+  async getLinkedSegment(id: string): Promise<LinkedSegment | undefined> {
+    return this.linkedSegments.get(id);
+  }
+
+  async createLinkedSegment(insertSegment: InsertLinkedSegment): Promise<LinkedSegment> {
+    const id = randomUUID();
+    const existingSegments = Array.from(this.linkedSegments.values());
+    const maxOrder = existingSegments.length > 0 
+      ? Math.max(...existingSegments.map((s) => s.order)) + 1 
+      : 0;
+    const segment: LinkedSegment = { ...insertSegment, id, order: maxOrder };
+    this.linkedSegments.set(id, segment);
+    return segment;
+  }
+
+  async deleteLinkedSegment(id: string): Promise<boolean> {
+    const result = this.linkedSegments.delete(id);
+    this.reindexLinkedSegments();
+    return result;
+  }
+
+  async deleteLinkedSegmentByTimelinePosition(timelineId: string, position: number): Promise<boolean> {
+    const segment = Array.from(this.linkedSegments.values()).find(
+      (s) => s.timelineId === timelineId && s.position === position
+    );
+    if (segment) {
+      const result = this.linkedSegments.delete(segment.id);
+      this.reindexLinkedSegments();
+      return result;
+    }
+    return false;
+  }
+
+  private reindexLinkedSegments(): void {
+    const sorted = Array.from(this.linkedSegments.values()).sort((a, b) => a.order - b.order);
+    sorted.forEach((segment, index) => {
+      if (segment.order !== index) {
+        this.linkedSegments.set(segment.id, { ...segment, order: index });
+      }
+    });
+  }
+
+  async clearLinkedSegments(): Promise<boolean> {
+    this.linkedSegments.clear();
     return true;
   }
 

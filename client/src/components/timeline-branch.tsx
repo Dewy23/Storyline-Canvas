@@ -1,34 +1,44 @@
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TimelineRow } from "./timeline-row";
+import { Segment } from "./segment";
 import { useAppStore } from "@/lib/store";
-import type { Timeline, Tile, TileLink } from "@shared/schema";
+import type { Timeline, Tile } from "@shared/schema";
 
 interface TimelineBranchProps {
   timeline: Timeline;
   tiles: Tile[];
-  onInsertTile: (timelineId: string, type: "image" | "video", position: number) => void;
   onGenerate: (tileId: string) => void;
   onDeleteTimeline: (timelineId: string) => void;
   onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
-  tileLinks?: TileLink[];
   isFirst?: boolean;
 }
 
 export function TimelineBranch({
   timeline,
   tiles,
-  onInsertTile,
   onGenerate,
   onDeleteTimeline,
   onFrameSliderChange,
-  tileLinks = [],
   isFirst = false,
 }: TimelineBranchProps) {
-  const { updateTimeline } = useAppStore();
+  const { updateTimeline, linkedSegments, timelines } = useAppStore();
+  const isSingleTimeline = timelines.length === 1;
 
   const toggleCollapse = () => {
     updateTimeline(timeline.id, { isCollapsed: !timeline.isCollapsed });
+  };
+
+  const timelineTiles = tiles.filter((t) => t.timelineId === timeline.id);
+  const imageTiles = timelineTiles.filter((t) => t.type === "image").sort((a, b) => a.position - b.position);
+  const videoTiles = timelineTiles.filter((t) => t.type === "video");
+
+  const positions = Array.from(new Set(imageTiles.map((t) => t.position))).sort((a, b) => a - b);
+
+  const isSegmentLinked = (position: number) => {
+    if (isSingleTimeline) return true;
+    return linkedSegments.some(
+      (s) => s.timelineId === timeline.id && s.position === position
+    );
   };
 
   return (
@@ -67,37 +77,26 @@ export function TimelineBranch({
         </div>
 
         {!timeline.isCollapsed && (
-          <div className="flex flex-col gap-4 p-3 pl-12 bg-card/20 overflow-x-auto">
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-2 pl-1">
-                Images
-              </div>
-              <TimelineRow
-                timeline={timeline}
-                tiles={tiles}
-                allTiles={tiles}
-                type="image"
-                onInsertTile={(pos) => onInsertTile(timeline.id, "image", pos)}
-                onGenerate={onGenerate}
-                onFrameSliderChange={onFrameSliderChange}
-                tileLinks={tileLinks}
-              />
-            </div>
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-2 pl-1">
-                Videos
-              </div>
-              <TimelineRow
-                timeline={timeline}
-                tiles={tiles}
-                allTiles={tiles}
-                type="video"
-                onInsertTile={(pos) => onInsertTile(timeline.id, "video", pos)}
-                onGenerate={onGenerate}
-                onFrameSliderChange={onFrameSliderChange}
-                tileLinks={tileLinks}
-              />
-            </div>
+          <div className="flex gap-3 p-3 pl-12 bg-card/20 overflow-x-auto">
+            {positions.map((position) => {
+              const imageTile = imageTiles.find((t) => t.position === position);
+              const videoTile = videoTiles.find((t) => t.position === position);
+              
+              if (!imageTile) return null;
+
+              return (
+                <Segment
+                  key={`${timeline.id}-${position}`}
+                  imageTile={imageTile}
+                  videoTile={videoTile}
+                  position={position}
+                  timelineId={timeline.id}
+                  onGenerate={onGenerate}
+                  onFrameSliderChange={onFrameSliderChange || (() => {})}
+                  isLinked={isSegmentLinked(position)}
+                />
+              );
+            })}
           </div>
         )}
       </div>

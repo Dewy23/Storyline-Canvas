@@ -7,7 +7,7 @@ import { SettingsModal } from "@/components/settings-modal";
 import { ExportModal } from "@/components/export-modal";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
-import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
+import type { Timeline, Tile, TileLink, LinkedSegment, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
 import { aiProviders } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
@@ -30,6 +30,8 @@ export default function Home() {
     setAudioClips,
     apiSettings,
     setApiSettings,
+    linkedSegments,
+    setLinkedSegments,
   } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -55,6 +57,10 @@ export default function Home() {
 
   const { data: tileLinksData, isLoading: linksLoading } = useQuery<TileLink[]>({
     queryKey: ["/api/tile-links"],
+  });
+
+  const { data: linkedSegmentsData, isLoading: segmentsLoading } = useQuery<LinkedSegment[]>({
+    queryKey: ["/api/linked-segments"],
   });
 
   const createTimelineMutation = useMutation({
@@ -108,6 +114,12 @@ export default function Home() {
       setTileLinks(tileLinksData);
     }
   }, [tileLinksData, setTileLinks]);
+
+  useEffect(() => {
+    if (linkedSegmentsData) {
+      setLinkedSegments(linkedSegmentsData);
+    }
+  }, [linkedSegmentsData, setLinkedSegments]);
 
   useEffect(() => {
     if (!timelinesLoading && timelinesData && timelinesData.length === 0) {
