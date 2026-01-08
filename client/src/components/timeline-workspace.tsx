@@ -1,7 +1,11 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TimelineBranch } from "./timeline-branch";
+import { TimelineToolbar } from "./timeline-toolbar";
+import { LinkModal } from "./link-modal";
+import { RenderPreview } from "./render-preview";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -9,16 +13,15 @@ import type { Tile, Timeline } from "@shared/schema";
 
 export function TimelineWorkspace() {
   const { 
-    timelines, tiles, 
-    addTimeline, addTile, updateTile, removeTimeline, removeTile 
+    timelines, tiles, tileLinks,
+    addTimeline, addTile, updateTile, removeTimeline, removeTile,
+    setLinkModalOpen, isLinkModalOpen
   } = useAppStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const tilesRef = useRef(tiles);
   tilesRef.current = tiles;
-
-  const rootTimelines = timelines.filter((t) => !t.parentTimelineId);
 
   const createTileMutation = useMutation({
     mutationFn: async (tile: Omit<Tile, "id">) => {
@@ -181,87 +184,75 @@ export function TimelineWorkspace() {
     [tiles, createTileMutation, updateTileMutation, toast]
   );
 
-  const handleBranchUp = useCallback(
-    (tileId: string) => {
-      const tile = tiles.find((t) => t.id === tileId);
-      if (!tile) return;
+  const handleAddTimeline = useCallback(() => {
+    const lastTimeline = timelines[timelines.length - 1];
+    const lastTimelineTiles = lastTimeline 
+      ? tiles.filter((t) => t.timelineId === lastTimeline.id)
+      : [];
+    
+    const newTimeline: Omit<Timeline, "id"> = {
+      name: `Timeline ${timelines.length + 1}`,
+      isCollapsed: false,
+      order: timelines.length,
+    };
 
-      const branchCount = timelines.filter(
-        (t) => t.branchFromTileId === tileId && t.branchDirection === "up"
-      ).length;
+    createTimelineMutation.mutate(newTimeline, {
+      onSuccess: (createdTimeline) => {
+        if (lastTimelineTiles.length > 0) {
+          const imageTiles = lastTimelineTiles.filter((t) => t.type === "image");
+          const videoTiles = lastTimelineTiles.filter((t) => t.type === "video");
+          
+          imageTiles.forEach((t) => {
+            const newTile: Omit<Tile, "id"> = {
+              type: "image",
+              timelineId: createdTimeline.id,
+              position: t.position,
+              prompt: t.prompt,
+              selectedFrame: 100,
+              isGenerating: false,
+            };
+            createTileMutation.mutate(newTile);
+          });
 
-      const newTimeline: Omit<Timeline, "id"> = {
-        name: `Branch ${timelines.length + 1}`,
-        parentTimelineId: tile.timelineId,
-        branchFromTileId: tileId,
-        branchDirection: "up",
-        isCollapsed: false,
-        order: branchCount,
-      };
-
-      createTimelineMutation.mutate(newTimeline, {
-        onSuccess: (createdTimeline) => {
-          const newImageTile: Omit<Tile, "id"> = {
-            type: "image",
-            timelineId: createdTimeline.id,
-            position: 0,
-            prompt: tile.prompt || "",
-            selectedFrame: 100,
-            isGenerating: false,
-            mediaUrl: tile.mediaUrl,
-          };
-          createTileMutation.mutate(newImageTile);
+          videoTiles.forEach((t) => {
+            const newTile: Omit<Tile, "id"> = {
+              type: "video",
+              timelineId: createdTimeline.id,
+              position: t.position,
+              prompt: t.prompt,
+              selectedFrame: 0,
+              isGenerating: false,
+            };
+            createTileMutation.mutate(newTile);
+          });
+        } else {
+          [0, 1, 2].forEach((pos) => {
+            createTileMutation.mutate({
+              type: "image",
+              timelineId: createdTimeline.id,
+              position: pos,
+              prompt: "",
+              selectedFrame: 0,
+              isGenerating: false,
+            });
+            createTileMutation.mutate({
+              type: "video",
+              timelineId: createdTimeline.id,
+              position: pos,
+              prompt: "",
+              selectedFrame: 0,
+              isGenerating: false,
+            });
+          });
         }
-      });
+      }
+    });
 
-      toast({
-        title: "Branch created",
-        description: "New branch created from this image",
-      });
-    },
-    [tiles, timelines, createTimelineMutation, createTileMutation, toast]
-  );
-
-  const handleBranchDown = useCallback(
-    (tileId: string) => {
-      const tile = tiles.find((t) => t.id === tileId);
-      if (!tile) return;
-
-      const branchCount = timelines.filter(
-        (t) => t.branchFromTileId === tileId && t.branchDirection === "down"
-      ).length;
-
-      const newTimeline: Omit<Timeline, "id"> = {
-        name: `Branch ${timelines.length + 1}`,
-        parentTimelineId: tile.timelineId,
-        branchFromTileId: tileId,
-        branchDirection: "down",
-        isCollapsed: false,
-        order: branchCount,
-      };
-
-      createTimelineMutation.mutate(newTimeline, {
-        onSuccess: (createdTimeline) => {
-          const newVideoTile: Omit<Tile, "id"> = {
-            type: "video",
-            timelineId: createdTimeline.id,
-            position: 0,
-            prompt: tile.prompt || "",
-            selectedFrame: 0,
-            isGenerating: false,
-            mediaUrl: tile.mediaUrl,
-          };
-          createTileMutation.mutate(newVideoTile);
-        }
-      });
-
-      toast({
-        title: "Branch created",
-        description: "New branch created from this video",
-      });
-    },
-    [tiles, timelines, createTimelineMutation, createTileMutation, toast]
-  );
+    toast({
+      title: "Timeline added",
+      description: "New timeline created with copied structure",
+    });
+  }, [timelines, tiles, createTimelineMutation, createTileMutation, toast]);
 
   const handleGenerate = useCallback(
     (tileId: string) => {
@@ -290,55 +281,68 @@ export function TimelineWorkspace() {
           deleteTileMutation.mutate(t.id);
         });
       
-      const childTimelines = timelines.filter((t) => t.parentTimelineId === timelineId);
-      childTimelines.forEach((t) => {
-        tiles.filter((tile) => tile.timelineId === t.id).forEach((tile) => {
-          removeTile(tile.id);
-          deleteTileMutation.mutate(tile.id);
-        });
-        removeTimeline(t.id);
-        deleteTimelineMutation.mutate(t.id);
-      });
-      
       removeTimeline(timelineId);
       deleteTimelineMutation.mutate(timelineId);
 
       toast({
-        title: "Branch deleted",
-        description: "The branch and its contents have been removed",
+        title: "Timeline deleted",
+        description: "The timeline and its contents have been removed",
       });
     },
-    [tiles, timelines, removeTile, removeTimeline, deleteTileMutation, deleteTimelineMutation, toast]
+    [tiles, removeTile, removeTimeline, deleteTileMutation, deleteTimelineMutation, toast]
   );
 
+  const sortedTimelines = [...timelines].sort((a, b) => a.order - b.order);
+
   return (
-    <ScrollArea className="flex-1 p-6">
-      <div className="space-y-6 min-w-max">
-        {rootTimelines.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <p>Loading timeline...</p>
-          </div>
-        ) : (
-          rootTimelines.map((timeline) => (
-            <TimelineBranch
-              key={timeline.id}
-              timeline={timeline}
-              tiles={tiles}
-              childTimelines={timelines.filter(
-                (t) => t.parentTimelineId === timeline.id
-              )}
-              allTimelines={timelines}
-              onInsertTile={handleInsertTile}
-              onBranchUp={handleBranchUp}
-              onBranchDown={handleBranchDown}
-              onGenerate={handleGenerate}
-              onDeleteTimeline={handleDeleteTimeline}
-              onFrameSliderChange={handleFrameSliderChange}
-            />
-          ))
-        )}
-      </div>
-      <ScrollBar orientation="horizontal" />
-    </ScrollArea>
+    <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanel defaultSize={6} minSize={4} maxSize={10}>
+        <TimelineToolbar />
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={94} minSize={60}>
+        <ResizablePanelGroup direction="vertical">
+          <ResizablePanel defaultSize={75} minSize={30}>
+            <ScrollArea className="h-full">
+              <div className="min-w-max">
+                {sortedTimelines.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <p>Loading timeline...</p>
+                  </div>
+                ) : (
+                  sortedTimelines.map((timeline, index) => (
+                    <TimelineBranch
+                      key={timeline.id}
+                      timeline={timeline}
+                      tiles={tiles}
+                      onInsertTile={handleInsertTile}
+                      onGenerate={handleGenerate}
+                      onDeleteTimeline={handleDeleteTimeline}
+                      onFrameSliderChange={handleFrameSliderChange}
+                      tileLinks={tileLinks}
+                      isFirst={index === 0}
+                    />
+                  ))
+                )}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize={25} minSize={10} collapsible>
+            <RenderPreview />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </ResizablePanel>
+
+      <LinkModal 
+        open={isLinkModalOpen} 
+        onOpenChange={setLinkModalOpen}
+      />
+    </ResizablePanelGroup>
   );
 }

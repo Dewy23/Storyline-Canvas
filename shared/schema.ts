@@ -50,19 +50,28 @@ export const tileSchema = z.object({
 export type Tile = z.infer<typeof tileSchema>;
 export type InsertTile = Omit<Tile, "id">;
 
-// Timeline/Branch schema
+// Timeline schema (simplified - no branching)
 export const timelineSchema = z.object({
   id: z.string(),
   name: z.string().default("Main Timeline"),
-  parentTimelineId: z.string().optional(),
-  branchFromTileId: z.string().optional(),
-  branchDirection: z.enum(["up", "down"]).optional(),
   isCollapsed: z.boolean().default(false),
   order: z.number().default(0),
+  height: z.number().optional(), // for resizable rows
 });
 
 export type Timeline = z.infer<typeof timelineSchema>;
 export type InsertTimeline = Omit<Timeline, "id">;
+
+// Tile Link schema - for linking tiles across timelines
+export const tileLinkSchema = z.object({
+  id: z.string(),
+  tileId: z.string(),
+  timelineId: z.string(),
+  order: z.number(), // position in the linked sequence
+});
+
+export type TileLink = z.infer<typeof tileLinkSchema>;
+export type InsertTileLink = Omit<TileLink, "id">;
 
 // Audio Track schema
 export const audioTrackSchema = z.object({
@@ -115,6 +124,7 @@ export const projectSchema = z.object({
   name: z.string().default("Untitled Project"),
   timelines: z.array(timelineSchema),
   tiles: z.array(tileSchema),
+  tileLinks: z.array(tileLinkSchema),
   audioTracks: z.array(audioTrackSchema),
   audioClips: z.array(audioClipSchema),
 });
@@ -124,6 +134,7 @@ export type Project = z.infer<typeof projectSchema>;
 // Insert schemas for API
 export const insertTileSchema = tileSchema.omit({ id: true });
 export const insertTimelineSchema = timelineSchema.omit({ id: true });
+export const insertTileLinkSchema = tileLinkSchema.omit({ id: true });
 export const insertAudioTrackSchema = audioTrackSchema.omit({ id: true });
 export const insertAudioClipSchema = audioClipSchema.omit({ id: true });
 export const insertApiSettingSchema = apiSettingSchema.omit({ id: true, isConnected: true });

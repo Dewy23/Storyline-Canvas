@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Image, Video, Wand2, ChevronUp, ChevronDown, Loader2, Maximize2, X, Film, ImageIcon } from "lucide-react";
+import { Image, Video, Wand2, Loader2, Maximize2, X, Film, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,14 +13,11 @@ import type { Tile as TileType, AIProvider } from "@shared/schema";
 
 interface TileProps {
   tile: TileType;
-  onBranchUp: () => void;
-  onBranchDown: () => void;
   onGenerate: () => void;
-  showBranchUp?: boolean;
-  showBranchDown?: boolean;
   previousVideoTile?: TileType;
   aboveImageTile?: TileType;
   onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
+  isLinked?: boolean;
 }
 
 const providerLabels: Record<AIProvider, string> = {
@@ -42,14 +39,11 @@ const videoProviders: AIProvider[] = ["runway", "kling", "pika", "luma"];
 
 export function Tile({
   tile,
-  onBranchUp,
-  onBranchDown,
   onGenerate,
-  showBranchUp = true,
-  showBranchDown = true,
   previousVideoTile,
   aboveImageTile,
   onFrameSliderChange,
+  isLinked = false,
 }: TileProps) {
   const [activeTab, setActiveTab] = useState<"view" | "prompt" | "source">("view");
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -178,23 +172,10 @@ export function Tile({
   return (
     <>
       <div className="relative group flex flex-col">
-        {showBranchUp && tile.type === "image" && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute -top-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            onClick={onBranchUp}
-            data-testid={`button-branch-up-${tile.id}`}
-            aria-label="Create branch above"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </Button>
-        )}
-
         <Card
           className={`w-48 flex flex-col cursor-pointer transition-all ${
             isSelected ? "ring-2 ring-primary" : ""
-          }`}
+          } ${isLinked ? "ring-2 ring-green-500" : ""}`}
           onClick={() => setSelectedTileId(tile.id)}
           data-testid={`tile-${tile.type}-${tile.id}`}
         >
@@ -380,19 +361,6 @@ export function Tile({
             </TabsContent>
           </Tabs>
         </Card>
-
-        {showBranchDown && tile.type === "video" && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute -bottom-5 left-1/2 -translate-x-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            onClick={onBranchDown}
-            data-testid={`button-branch-down-${tile.id}`}
-            aria-label="Create branch below"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-        )}
       </div>
 
       {isLightboxOpen && (

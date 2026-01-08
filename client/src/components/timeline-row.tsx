@@ -1,6 +1,6 @@
 import { Tile } from "./tile";
 import { InsertButton } from "./insert-button";
-import type { Tile as TileType, Timeline } from "@shared/schema";
+import type { Tile as TileType, Timeline, TileLink } from "@shared/schema";
 
 interface TimelineRowProps {
   timeline: Timeline;
@@ -8,10 +8,9 @@ interface TimelineRowProps {
   allTiles?: TileType[];
   type: "image" | "video";
   onInsertTile: (position: number) => void;
-  onBranchUp: (tileId: string) => void;
-  onBranchDown: (tileId: string) => void;
   onGenerate: (tileId: string) => void;
   onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
+  tileLinks?: TileLink[];
 }
 
 export function TimelineRow({
@@ -20,10 +19,9 @@ export function TimelineRow({
   allTiles = tiles,
   type,
   onInsertTile,
-  onBranchUp,
-  onBranchDown,
   onGenerate,
   onFrameSliderChange,
+  tileLinks = [],
 }: TimelineRowProps) {
   const filteredTiles = tiles
     .filter((t) => t.type === type && t.timelineId === timeline.id)
@@ -47,6 +45,10 @@ export function TimelineRow({
     return imageTiles.find((it) => it.position === videoTile.position);
   };
 
+  const isTileLinked = (tileId: string): boolean => {
+    return tileLinks.some((link) => link.tileId === tileId);
+  };
+
   return (
     <div className="flex items-start gap-1 min-h-[180px]">
       {filteredTiles.length === 0 ? (
@@ -68,14 +70,11 @@ export function TimelineRow({
             <div key={tile.id} className="flex items-start">
               <Tile
                 tile={tile}
-                onBranchUp={() => onBranchUp(tile.id)}
-                onBranchDown={() => onBranchDown(tile.id)}
                 onGenerate={() => onGenerate(tile.id)}
-                showBranchUp={type === "image"}
-                showBranchDown={type === "video"}
                 previousVideoTile={type === "image" ? getPreviousVideoTile(tile) : undefined}
                 aboveImageTile={type === "video" ? getAboveImageTile(tile) : undefined}
                 onFrameSliderChange={onFrameSliderChange}
+                isLinked={isTileLinked(tile.id)}
               />
               <InsertButton
                 onClick={() => onInsertTile(index + 1)}

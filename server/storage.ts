@@ -4,6 +4,8 @@ import type {
   InsertTile,
   Timeline,
   InsertTimeline,
+  TileLink,
+  InsertTileLink,
   AudioTrack,
   InsertAudioTrack,
   AudioClip,
@@ -27,6 +29,13 @@ export interface IStorage {
   createTile(tile: InsertTile): Promise<Tile>;
   updateTile(id: string, updates: Partial<Tile>): Promise<Tile | undefined>;
   deleteTile(id: string): Promise<boolean>;
+
+  // Tile Links
+  getTileLinks(): Promise<TileLink[]>;
+  getTileLink(id: string): Promise<TileLink | undefined>;
+  createTileLink(link: InsertTileLink): Promise<TileLink>;
+  deleteTileLink(id: string): Promise<boolean>;
+  clearTileLinks(): Promise<boolean>;
 
   // Audio Tracks
   getAudioTracks(): Promise<AudioTrack[]>;
@@ -53,6 +62,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private timelines: Map<string, Timeline>;
   private tiles: Map<string, Tile>;
+  private tileLinks: Map<string, TileLink>;
   private audioTracks: Map<string, AudioTrack>;
   private audioClips: Map<string, AudioClip>;
   private apiSettings: Map<string, APISetting>;
@@ -60,6 +70,7 @@ export class MemStorage implements IStorage {
   constructor() {
     this.timelines = new Map();
     this.tiles = new Map();
+    this.tileLinks = new Map();
     this.audioTracks = new Map();
     this.audioClips = new Map();
     this.apiSettings = new Map();
@@ -90,6 +101,12 @@ export class MemStorage implements IStorage {
   }
 
   async deleteTimeline(id: string): Promise<boolean> {
+    const tilesToDelete = Array.from(this.tiles.values()).filter((t) => t.timelineId === id);
+    tilesToDelete.forEach((t) => this.tiles.delete(t.id));
+    
+    const linksToDelete = Array.from(this.tileLinks.values()).filter((l) => l.timelineId === id);
+    linksToDelete.forEach((l) => this.tileLinks.delete(l.id));
+    
     return this.timelines.delete(id);
   }
 
@@ -122,7 +139,35 @@ export class MemStorage implements IStorage {
   }
 
   async deleteTile(id: string): Promise<boolean> {
+    const linksToDelete = Array.from(this.tileLinks.values()).filter((l) => l.tileId === id);
+    linksToDelete.forEach((l) => this.tileLinks.delete(l.id));
+    
     return this.tiles.delete(id);
+  }
+
+  // Tile Links
+  async getTileLinks(): Promise<TileLink[]> {
+    return Array.from(this.tileLinks.values()).sort((a, b) => a.order - b.order);
+  }
+
+  async getTileLink(id: string): Promise<TileLink | undefined> {
+    return this.tileLinks.get(id);
+  }
+
+  async createTileLink(insertLink: InsertTileLink): Promise<TileLink> {
+    const id = randomUUID();
+    const link: TileLink = { ...insertLink, id };
+    this.tileLinks.set(id, link);
+    return link;
+  }
+
+  async deleteTileLink(id: string): Promise<boolean> {
+    return this.tileLinks.delete(id);
+  }
+
+  async clearTileLinks(): Promise<boolean> {
+    this.tileLinks.clear();
+    return true;
   }
 
   // Audio Tracks

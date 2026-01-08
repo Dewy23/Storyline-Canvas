@@ -7,7 +7,7 @@ import { SettingsModal } from "@/components/settings-modal";
 import { ExportModal } from "@/components/export-modal";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
-import type { Timeline, Tile, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
+import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
 import { aiProviders } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
@@ -22,6 +22,8 @@ export default function Home() {
     setTimelines, 
     tiles,
     setTiles,
+    tileLinks,
+    setTileLinks,
     audioTracks,
     setAudioTracks,
     audioClips,
@@ -51,15 +53,23 @@ export default function Home() {
     queryKey: ["/api/settings"],
   });
 
+  const { data: tileLinksData, isLoading: linksLoading } = useQuery<TileLink[]>({
+    queryKey: ["/api/tile-links"],
+  });
+
   const createTimelineMutation = useMutation({
-    mutationFn: (timeline: Omit<Timeline, "id">) => 
-      apiRequest<Timeline>("POST", "/api/timelines", timeline),
+    mutationFn: async (timeline: Omit<Timeline, "id">) => {
+      const response = await apiRequest("POST", "/api/timelines", timeline);
+      return response.json() as Promise<Timeline>;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/timelines"] }),
   });
 
   const createTileMutation = useMutation({
-    mutationFn: (tile: Omit<Tile, "id">) => 
-      apiRequest<Tile>("POST", "/api/tiles", tile),
+    mutationFn: async (tile: Omit<Tile, "id">) => {
+      const response = await apiRequest("POST", "/api/tiles", tile);
+      return response.json() as Promise<Tile>;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tiles"] }),
   });
 
@@ -92,6 +102,12 @@ export default function Home() {
       setApiSettings(settingsData);
     }
   }, [settingsData, setApiSettings]);
+
+  useEffect(() => {
+    if (tileLinksData) {
+      setTileLinks(tileLinksData);
+    }
+  }, [tileLinksData, setTileLinks]);
 
   useEffect(() => {
     if (!timelinesLoading && timelinesData && timelinesData.length === 0) {

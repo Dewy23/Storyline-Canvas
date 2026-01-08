@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import {
   insertTileSchema,
   insertTimelineSchema,
+  insertTileLinkSchema,
   insertAudioTrackSchema,
   insertAudioClipSchema,
   insertApiSettingSchema,
@@ -102,6 +103,38 @@ export async function registerRoutes(
     if (!deleted) {
       return res.status(404).json({ error: "Tile not found" });
     }
+    res.status(204).send();
+  });
+
+  // Tile Links
+  app.get("/api/tile-links", async (req, res) => {
+    const links = await storage.getTileLinks();
+    res.json(links);
+  });
+
+  app.post("/api/tile-links", async (req, res) => {
+    try {
+      const data = insertTileLinkSchema.parse(req.body);
+      const link = await storage.createTileLink(data);
+      res.status(201).json(link);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/tile-links/:id", async (req, res) => {
+    const deleted = await storage.deleteTileLink(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Tile link not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.delete("/api/tile-links", async (req, res) => {
+    await storage.clearTileLinks();
     res.status(204).send();
   });
 

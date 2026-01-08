@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Timeline, Tile, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
+import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
 
 interface AppState {
   activeTab: "timeline" | "audio";
@@ -16,6 +16,12 @@ interface AppState {
   addTile: (tile: Tile) => void;
   updateTile: (id: string, updates: Partial<Tile>) => void;
   removeTile: (id: string) => void;
+  
+  tileLinks: TileLink[];
+  setTileLinks: (links: TileLink[]) => void;
+  addTileLink: (link: TileLink) => void;
+  removeTileLink: (id: string) => void;
+  clearTileLinks: () => void;
   
   audioTracks: AudioTrack[];
   setAudioTracks: (tracks: AudioTrack[]) => void;
@@ -41,6 +47,9 @@ interface AppState {
   
   isExportOpen: boolean;
   setExportOpen: (open: boolean) => void;
+  
+  isLinkModalOpen: boolean;
+  setLinkModalOpen: (open: boolean) => void;
   
   playheadPosition: number;
   setPlayheadPosition: (pos: number) => void;
@@ -75,6 +84,14 @@ export const useAppStore = create<AppState>((set) => ({
   removeTile: (id) => set((state) => ({
     tiles: state.tiles.filter((t) => t.id !== id)
   })),
+  
+  tileLinks: [],
+  setTileLinks: (links) => set({ tileLinks: links }),
+  addTileLink: (link) => set((state) => ({ tileLinks: [...state.tileLinks, link] })),
+  removeTileLink: (id) => set((state) => ({
+    tileLinks: state.tileLinks.filter((l) => l.id !== id)
+  })),
+  clearTileLinks: () => set({ tileLinks: [] }),
   
   audioTracks: [],
   setAudioTracks: (tracks) => set({ audioTracks: tracks }),
@@ -112,6 +129,9 @@ export const useAppStore = create<AppState>((set) => ({
   
   isExportOpen: false,
   setExportOpen: (open) => set({ isExportOpen: open }),
+  
+  isLinkModalOpen: false,
+  setLinkModalOpen: (open) => set({ isLinkModalOpen: open }),
   
   playheadPosition: 0,
   setPlayheadPosition: (pos) => set({ playheadPosition: pos }),
