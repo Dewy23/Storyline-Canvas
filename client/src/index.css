@@ -378,7 +378,9 @@
 }
 
 /* Clean splitters - cursor-based resizing like VS Code/Figma 
-   20px hit area for reliable hover detection on all devices */
+   30px hit area for reliable hover detection on all devices */
+
+/* Base splitter styles */
 .lm_splitter {
   background: transparent !important;
   opacity: 1 !important;
@@ -389,31 +391,48 @@
   touch-action: none !important;
 }
 
-.lm_splitter:hover {
-  background: rgba(100, 149, 237, 0.2) !important;
+/* Horizontal splitter - between TOP and BOTTOM panels (row-resize cursor ↕) */
+.lm_splitter.lm_horizontal {
+  height: 8px !important;
+  cursor: row-resize !important;
+}
+
+.lm_splitter.lm_horizontal .lm_drag_handle {
+  position: absolute !important;
+  height: 30px !important;
+  width: 100% !important;
+  top: -11px !important;
+  left: 0 !important;
+  cursor: row-resize !important;
+  background: transparent !important;
+}
+
+/* Vertical splitter - between LEFT and RIGHT panels (col-resize cursor ↔) */
+.lm_splitter.lm_vertical {
+  width: 8px !important;
+  cursor: col-resize !important;
+}
+
+.lm_splitter.lm_vertical .lm_drag_handle {
+  position: absolute !important;
+  width: 30px !important;
+  height: 100% !important;
+  left: -11px !important;
+  top: 0 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+/* Hover feedback */
+.lm_splitter:hover,
+.lm_splitter .lm_drag_handle:hover {
+  background: rgba(100, 149, 237, 0.15) !important;
 }
 
 .lm_splitter:active,
-.lm_splitter.lm_dragging {
-  background: rgba(100, 149, 237, 0.35) !important;
-}
-
-/* Vertical splitter (between left/right panels) - 20px wide for reliable targeting */
-.lm_splitter.lm_vertical {
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  cursor: col-resize !important;
-  margin: 0 -10px !important;
-}
-
-/* Horizontal splitter (between top/bottom panels) - 20px tall for reliable targeting */
-.lm_splitter.lm_horizontal {
-  height: 20px !important;
-  min-height: 20px !important;
-  max-height: 20px !important;
-  cursor: row-resize !important;
-  margin: -10px 0 !important;
+.lm_splitter.lm_dragging,
+.lm_splitter .lm_drag_handle:active {
+  background: rgba(100, 149, 237, 0.3) !important;
 }
 
 /* Subtle center line indicator - visible separator line */
@@ -421,7 +440,7 @@
   content: "";
   position: absolute;
   background: hsl(220 10% 40%);
-  transition: background 0.1s ease, transform 0.1s ease;
+  transition: background 0.1s ease;
   pointer-events: none;
 }
 
@@ -431,11 +450,6 @@
 
 .lm_splitter:hover::after {
   background: hsl(var(--primary));
-  transform: translateX(-50%) scaleX(1.5);
-}
-
-.lm_splitter.lm_horizontal:hover::after {
-  transform: translateY(-50%) scaleY(1.5);
 }
 
 /* Vertical splitter - thin vertical line in center */
@@ -456,7 +470,7 @@
   transform: translateY(-50%);
 }
 
-/* Ensure splitters are always above panel content and row/column containers */
+/* Ensure splitters are always above panel content */
 .lm_goldenlayout .lm_item,
 .lm_goldenlayout .lm_row,
 .lm_goldenlayout .lm_column,
@@ -464,8 +478,9 @@
   overflow: visible !important;
 }
 
-/* Force splitters to be on top of everything */
-.lm_goldenlayout .lm_splitter {
+/* Force splitters and drag handles to be on top */
+.lm_goldenlayout .lm_splitter,
+.lm_goldenlayout .lm_splitter .lm_drag_handle {
   z-index: 9999 !important;
 }
 
