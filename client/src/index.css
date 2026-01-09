@@ -286,3 +286,126 @@
     inset: -1px;
   }
 }
+
+/* GoldenLayout Custom Styling */
+.golden-layout-container {
+  background: hsl(var(--background));
+}
+
+.lm_goldenlayout {
+  background: hsl(var(--background)) !important;
+}
+
+.lm_header {
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--muted) / 0.8),
+    hsl(var(--muted) / 0.5)
+  ) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  height: 28px !important;
+}
+
+.lm_header:hover {
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--muted)),
+    hsl(var(--muted) / 0.7)
+  ) !important;
+  cursor: grab;
+}
+
+.lm_header:active {
+  cursor: grabbing;
+}
+
+.lm_tab {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-bottom: none !important;
+  border-radius: 4px 4px 0 0 !important;
+  margin-right: 2px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.lm_tab.lm_active {
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-bottom: 1px solid hsl(var(--background)) !important;
+}
+
+.lm_tab:hover:not(.lm_active) {
+  background: hsl(var(--accent)) !important;
+}
+
+.lm_content {
+  background: hsl(var(--background)) !important;
+  border: none !important;
+}
+
+.lm_splitter {
+  background: hsl(var(--border)) !important;
+  opacity: 1 !important;
+}
+
+.lm_splitter:hover {
+  background: hsl(var(--primary)) !important;
+}
+
+.lm_splitter.lm_vertical {
+  width: 4px !important;
+}
+
+.lm_splitter.lm_horizontal {
+  height: 4px !important;
+}
+
+.lm_dropTargetIndicator {
+  background: hsl(var(--primary) / 0.3) !important;
+  border: 2px solid hsl(var(--primary)) !important;
+}
+
+.lm_dragProxy {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.lm_dragProxy .lm_header {
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--primary) / 0.1)
+  ) !important;
+}
+
+.lm_close_tab {
+  background: transparent !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin-left: 6px !important;
+}
+
+.lm_close_tab:hover {
+  background: hsl(var(--destructive) / 0.2) !important;
+  border-radius: 2px !important;
+}
+
+.lm_maximise, .lm_popout, .lm_close {
+  background: transparent !important;
+  opacity: 0.6 !important;
+}
+
+.lm_maximise:hover, .lm_popout:hover, .lm_close:hover {
+  opacity: 1 !important;
+}
+
+.gl-panel-content {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}

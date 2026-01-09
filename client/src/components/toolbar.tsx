@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAppStore, WORKSPACE_PRESETS, type WorkspacePreset } from "@/lib/store";
+import { useAppStore, type WorkspacePreset } from "@/lib/store";
 import { useTheme } from "@/components/theme-provider";
 import { useToast } from "@/hooks/use-toast";
 
@@ -17,6 +17,7 @@ const PRESET_LABELS: Record<WorkspacePreset, string> = {
   "tall-timelines": "Tall Timelines",
   compact: "Compact",
   custom: "Custom",
+  audio: "Audio Focus",
 };
 
 export function Toolbar() {
@@ -36,12 +37,20 @@ export function Toolbar() {
   };
 
   const handleSaveLayout = () => {
-    const current = customLayout || WORKSPACE_PRESETS[workspacePreset];
-    setCustomLayout(current);
-    toast({
-      title: "Layout saved",
-      description: "Current layout saved as custom preset",
-    });
+    const currentGoldenLayoutConfig = useAppStore.getState().goldenLayoutConfig;
+    if (currentGoldenLayoutConfig) {
+      setCustomLayout(currentGoldenLayoutConfig as any);
+      toast({
+        title: "Layout saved",
+        description: "Current layout saved as custom preset",
+      });
+    } else {
+      toast({
+        title: "Could not save",
+        description: "No layout changes to save",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleResetLayout = () => {
@@ -95,7 +104,7 @@ export function Toolbar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center">
-            {(Object.keys(PRESET_LABELS) as WorkspacePreset[]).filter(p => p !== "custom").map((preset) => (
+            {(Object.keys(PRESET_LABELS) as WorkspacePreset[]).filter(p => p !== "custom" && p !== "audio").map((preset) => (
               <DropdownMenuItem 
                 key={preset}
                 onClick={() => handlePresetChange(preset)}
@@ -105,6 +114,15 @@ export function Toolbar() {
                 {PRESET_LABELS[preset]}
               </DropdownMenuItem>
             ))}
+            {customLayout && (
+              <DropdownMenuItem 
+                onClick={() => handlePresetChange("custom")}
+                className={workspacePreset === "custom" ? "bg-accent" : ""}
+                data-testid="workspace-preset-custom"
+              >
+                {PRESET_LABELS.custom}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSaveLayout} data-testid="workspace-save">
               <Save className="w-4 h-4 mr-2" />

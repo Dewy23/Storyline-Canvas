@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Toolbar } from "@/components/toolbar";
-import { TimelineWorkspace } from "@/components/timeline-workspace";
-import { AudioWorkspace } from "@/components/audio-workspace";
+import { GoldenWorkspace } from "@/components/golden-workspace";
 import { SettingsModal } from "@/components/settings-modal";
 import { ExportModal } from "@/components/export-modal";
 import { useAppStore } from "@/lib/store";
@@ -181,11 +180,7 @@ export default function Home() {
     <div className="h-screen flex flex-col bg-background">
       <Toolbar />
       <main className="flex-1 overflow-hidden">
-        {activeTab === "timeline" ? (
-          <TimelineWorkspace />
-        ) : (
-          <AudioWorkspace />
-        )}
+        <GoldenWorkspace />
       </main>
       <SettingsModal />
       <ExportModal />

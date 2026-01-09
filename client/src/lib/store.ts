@@ -133,6 +133,9 @@ interface AppState {
   
   goldenLayoutConfig: GoldenLayoutConfig | null;
   setGoldenLayoutConfig: (config: GoldenLayoutConfig | null) => void;
+  
+  savedCustomGoldenLayout: GoldenLayoutConfig | null;
+  setSavedCustomGoldenLayout: (config: GoldenLayoutConfig | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -233,10 +236,17 @@ export const useAppStore = create<AppState>((set) => ({
   workspacePreset: "default",
   setWorkspacePreset: (preset) => set({ workspacePreset: preset }),
   customLayout: null,
-  setCustomLayout: (layout) => set({ customLayout: layout, workspacePreset: "custom" }),
+  setCustomLayout: (layout) => set({ 
+    customLayout: layout, 
+    savedCustomGoldenLayout: layout as unknown as GoldenLayoutConfig,
+    workspacePreset: "custom" 
+  }),
   isPreviewCollapsed: false,
   setPreviewCollapsed: (collapsed) => set({ isPreviewCollapsed: collapsed }),
   
   goldenLayoutConfig: null,
   setGoldenLayoutConfig: (config) => set({ goldenLayoutConfig: config }),
+  
+  savedCustomGoldenLayout: null,
+  setSavedCustomGoldenLayout: (config) => set({ savedCustomGoldenLayout: config }),
 }));

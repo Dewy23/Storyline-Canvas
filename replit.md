@@ -6,6 +6,12 @@ StoryForge AI is an AI-powered video editor focused on consistent character stor
 
 ## Recent Changes (January 2026)
 
+- **GoldenLayout Integration**: Added After Effects-style panel management with drag-and-drop docking
+  - React Portal-based rendering to preserve QueryClient and other React contexts across panels
+  - Custom CSS styling for headers with gradient highlights as drag cues
+  - Dockable panels: Render Preview, Timelines, Toolbar, Audio Workspace
+  - Workspace presets: Default, Wide Preview, Tall Timelines, Compact
+  - Save/load custom layouts via zustand state management
 - Expanded AI provider support with 20+ providers across Image, Video, and Audio categories
 - Settings modal reorganized into 3 tabs: Image Providers, Video Providers, Audio Providers
 - Working image generation: OpenAI/DALL-E, Stability AI, Flux, Ideogram, Pollinations, Gemini, Replicate
@@ -55,7 +61,8 @@ Preferred communication style: Simple, everyday language.
 The application follows a professional creative tool aesthetic inspired by Adobe Premiere and DaVinci Resolve:
 - Typography: Inter font family with defined heading scales
 - Spacing: Tailwind units (1, 2, 3, 4, 6, 8, 12) for consistent spacing
-- Layout: Fixed sidebar with main workspace, two-row grid for timeline tracks
+- Layout: GoldenLayout-based panel system with drag/dock/resize capabilities
+- Panel Headers: Light gradient backgrounds with cursor:grab for drag affordance
 
 ## External Dependencies
 
