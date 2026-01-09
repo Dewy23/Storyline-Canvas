@@ -49,9 +49,9 @@ const providerLabels: Record<AIProvider, string> = {
   dalle3: "DALL-E 3",
 };
 
-// Providers with working implementations
-const imageProviders: AIProvider[] = ["openai", "stability", "flux", "ideogram", "pollinations", "gemini", "replicate"];
-const videoProviders: AIProvider[] = ["runway", "luma", "replicate"];
+// All available providers (filter by connected status at runtime)
+const imageProviders: AIProvider[] = ["openai", "gemini", "stability", "flux", "ideogram", "hunyuan", "firefly", "bria", "pollinations", "runware", "replicate"];
+const videoProviders: AIProvider[] = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
 
 export function Tile({
   tile,
