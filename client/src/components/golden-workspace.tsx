@@ -15,6 +15,7 @@ interface PortalEntry {
   container: HTMLElement;
   panelType: PanelType;
   componentContainer: ComponentContainer;
+  isVisible: boolean;
 }
 
 const DEFAULT_LAYOUT: LayoutConfig = {
@@ -253,6 +254,7 @@ export function GoldenWorkspace() {
   const [portals, setPortals] = useState<Map<string, PortalEntry>>(new Map());
   const currentPresetRef = useRef<string>("");
   const isInitializedRef = useRef(false);
+  const prevPanelVisibilityRef = useRef<Record<string, boolean>>({});
 
   const { 
     workspacePreset, 
@@ -277,8 +279,31 @@ export function GoldenWorkspace() {
         container: element,
         panelType,
         componentContainer: container,
+        isVisible: true,
       });
       return next;
+    });
+
+    container.on("show", () => {
+      setPortals(prev => {
+        const next = new Map(prev);
+        const entry = next.get(id);
+        if (entry) {
+          next.set(id, { ...entry, isVisible: true });
+        }
+        return next;
+      });
+    });
+
+    container.on("hide", () => {
+      setPortals(prev => {
+        const next = new Map(prev);
+        const entry = next.get(id);
+        if (entry) {
+          next.set(id, { ...entry, isVisible: false });
+        }
+        return next;
+      });
     });
 
     container.on("destroy", () => {
@@ -358,15 +383,21 @@ export function GoldenWorkspace() {
   }, [workspacePreset, savedCustomGoldenLayout]);
 
   const portalElements = useMemo(() => {
-    return Array.from(portals.entries()).map(([id, entry]) => 
-      createPortal(
-        <div className="h-full w-full overflow-hidden bg-background">
+    return Array.from(portals.entries()).map(([id, entry]) => {
+      return createPortal(
+        <div 
+          className="h-full w-full overflow-hidden bg-background"
+          style={{ 
+            visibility: entry.isVisible ? 'visible' : 'hidden',
+            position: 'relative',
+          }}
+        >
           <PanelComponent panelType={entry.panelType} />
         </div>,
         entry.container,
         id
-      )
-    );
+      );
+    });
   }, [portals]);
 
   return (

@@ -136,6 +136,10 @@ interface AppState {
   
   savedCustomGoldenLayout: GoldenLayoutConfig | null;
   setSavedCustomGoldenLayout: (config: GoldenLayoutConfig | null) => void;
+  
+  panelVisibility: Record<string, boolean>;
+  setPanelVisibility: (panel: string, visible: boolean) => void;
+  togglePanelVisibility: (panel: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -249,4 +253,17 @@ export const useAppStore = create<AppState>((set) => ({
   
   savedCustomGoldenLayout: null,
   setSavedCustomGoldenLayout: (config) => set({ savedCustomGoldenLayout: config }),
+  
+  panelVisibility: {
+    RenderPreview: true,
+    TimelineToolbar: true,
+    Timelines: true,
+    AudioWorkspace: true,
+  },
+  setPanelVisibility: (panel, visible) => set((state) => ({
+    panelVisibility: { ...state.panelVisibility, [panel]: visible }
+  })),
+  togglePanelVisibility: (panel) => set((state) => ({
+    panelVisibility: { ...state.panelVisibility, [panel]: !state.panelVisibility[panel] }
+  })),
 }));
