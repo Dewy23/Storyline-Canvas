@@ -37,9 +37,9 @@ export function Toolbar() {
   };
 
   const handleSaveLayout = () => {
-    const currentGoldenLayoutConfig = useAppStore.getState().goldenLayoutConfig;
-    if (currentGoldenLayoutConfig) {
-      setCustomLayout(currentGoldenLayoutConfig as any);
+    const currentLayout = useAppStore.getState().customLayout;
+    if (currentLayout) {
+      setWorkspacePreset("custom");
       toast({
         title: "Layout saved",
         description: "Current layout saved as custom preset",

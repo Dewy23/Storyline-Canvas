@@ -28,6 +28,7 @@ export function WorkspaceGrid() {
     setWorkspacePreset,
     customLayout,
     setCustomLayout,
+    activeTab,
   } = useAppStore();
   
   const [layout, setLayout] = useState<GridLayout>(() => {
@@ -133,7 +134,8 @@ export function WorkspaceGrid() {
   const showPreview = panelVisibility.RenderPreview !== false;
   const showToolbar = panelVisibility.TimelineToolbar !== false;
   const showTimelines = panelVisibility.Timelines !== false;
-  const showAudio = panelVisibility.AudioWorkspace !== false;
+  // Only show audio panel when Audio tab is active
+  const showAudio = panelVisibility.AudioWorkspace !== false && activeTab === "audio";
 
   const gridTemplateRows = [
     showPreview ? `${layout.previewHeight}%` : "0fr",
