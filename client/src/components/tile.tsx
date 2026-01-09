@@ -90,6 +90,18 @@ export function Tile({
     },
   });
 
+  // Auto-select first connected provider when tile.provider is invalid or missing
+  useEffect(() => {
+    if (hasConnectedProviders) {
+      const currentProviderIsValid = tile.provider && connectedProviders.includes(tile.provider);
+      if (!currentProviderIsValid) {
+        const firstConnected = connectedProviders[0];
+        updateTile(tile.id, { provider: firstConnected });
+        updateTileMutation.mutate({ id: tile.id, updates: { provider: firstConnected } });
+      }
+    }
+  }, [hasConnectedProviders, connectedProviders.join(','), tile.id, tile.provider]);
+
   const handlePromptChange = (value: string) => {
     updateTile(tile.id, { prompt: value });
   };
