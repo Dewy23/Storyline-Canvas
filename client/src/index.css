@@ -377,112 +377,67 @@
   border: none !important;
 }
 
-/* Splitters with visible resize handles */
+/* Clean splitters - cursor-based resizing like VS Code/Figma */
 .lm_splitter {
-  background: hsl(220 10% 30%) !important;
+  background: transparent !important;
   opacity: 1 !important;
   position: relative !important;
   z-index: 10 !important;
   transition: background 0.15s ease !important;
 }
 
-.dark .lm_splitter {
-  background: hsl(220 10% 25%) !important;
-}
-
 .lm_splitter:hover {
-  background: hsl(var(--primary) / 0.8) !important;
+  background: hsl(var(--primary) / 0.4) !important;
 }
 
+.lm_splitter:active {
+  background: hsl(var(--primary) / 0.6) !important;
+}
+
+/* Vertical splitter (between left/right panels) - 10px wide for easy targeting */
 .lm_splitter.lm_vertical {
-  width: 6px !important;
-  cursor: col-resize !important;
+  width: 10px !important;
+  cursor: ew-resize !important;
 }
 
+/* Horizontal splitter (between top/bottom panels) - 10px tall for easy targeting */
 .lm_splitter.lm_horizontal {
-  height: 6px !important;
-  cursor: row-resize !important;
+  height: 10px !important;
+  cursor: ns-resize !important;
 }
 
-/* Circular resize handle in center of splitter */
+/* Subtle center line indicator - no handles/dots */
 .lm_splitter::after {
   content: "";
   position: absolute;
-  background: hsl(220 10% 45%);
-  border-radius: 50%;
-  transition: all 0.15s ease;
-  opacity: 0.7;
-}
-
-.dark .lm_splitter::after {
-  background: hsl(220 10% 50%);
-}
-
-.lm_splitter:hover::after {
-  background: hsl(var(--primary));
-  opacity: 1;
-  transform: scale(1.2);
-}
-
-/* Vertical splitter - horizontal resize handle */
-.lm_splitter.lm_vertical::after {
-  width: 8px;
-  height: 24px;
-  border-radius: 4px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.lm_splitter.lm_vertical:hover::after {
-  transform: translate(-50%, -50%) scale(1.1);
-}
-
-/* Horizontal splitter - vertical resize handle */
-.lm_splitter.lm_horizontal::after {
-  width: 24px;
-  height: 8px;
-  border-radius: 4px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.lm_splitter.lm_horizontal:hover::after {
-  transform: translate(-50%, -50%) scale(1.1);
-}
-
-/* Additional edge indicators for splitters */
-.lm_splitter::before {
-  content: "";
-  position: absolute;
-  background: transparent;
+  background: hsl(220 10% 35%);
   transition: background 0.15s ease;
 }
 
-.lm_splitter.lm_vertical::before {
-  width: 2px;
+.dark .lm_splitter::after {
+  background: hsl(220 10% 28%);
+}
+
+.lm_splitter:hover::after {
+  background: hsl(var(--primary) / 0.8);
+}
+
+/* Vertical splitter - thin vertical line */
+.lm_splitter.lm_vertical::after {
+  width: 1px;
   height: 100%;
   left: 50%;
+  top: 0;
   transform: translateX(-50%);
-  background: hsl(220 10% 35%);
 }
 
-.lm_splitter.lm_horizontal::before {
-  height: 2px;
+/* Horizontal splitter - thin horizontal line */
+.lm_splitter.lm_horizontal::after {
+  height: 1px;
   width: 100%;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
-  background: hsl(220 10% 35%);
-}
-
-.dark .lm_splitter.lm_vertical::before,
-.dark .lm_splitter.lm_horizontal::before {
-  background: hsl(220 10% 30%);
-}
-
-.lm_splitter:hover::before {
-  background: hsl(var(--primary) / 0.5);
 }
 
 .lm_dropTargetIndicator {
