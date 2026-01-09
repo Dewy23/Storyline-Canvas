@@ -6,12 +6,13 @@ StoryForge AI is an AI-powered video editor focused on consistent character stor
 
 ## Recent Changes (January 2026)
 
-- **GoldenLayout Integration**: Added After Effects-style panel management with drag-and-drop docking
-  - React Portal-based rendering to preserve QueryClient and other React contexts across panels
-  - Custom CSS styling for headers with gradient highlights as drag cues
-  - Dockable panels: Render Preview, Timelines, Toolbar, Audio Workspace
-  - Workspace presets: Default, Wide Preview, Tall Timelines, Compact
-  - Save/load custom layouts via zustand state management
+- **Custom CSS Grid Workspace**: Replaced GoldenLayout with a lightweight custom CSS Grid layout system
+  - Full-length resizable separators with 24px hover zones for easy drag-to-resize
+  - Mouse event-based resizing with row-resize/col-resize cursors
+  - Panels: Render Preview (top), Toolbar (left), Timelines (center), Audio Workspace (bottom)
+  - Workspace presets: Default, Wide Preview, Tall Timelines, Compact, Audio Focus
+  - Custom layout persistence via zustand state management
+  - Panel visibility toggles for collapsing/showing individual panels
 - Expanded AI provider support with 20+ providers across Image, Video, and Audio categories
 - Settings modal reorganized into 3 tabs: Image Providers, Video Providers, Audio Providers
 - Working image generation: OpenAI/DALL-E, Stability AI, Flux, Ideogram, Pollinations, Gemini, Replicate
@@ -61,8 +62,8 @@ Preferred communication style: Simple, everyday language.
 The application follows a professional creative tool aesthetic inspired by Adobe Premiere and DaVinci Resolve:
 - Typography: Inter font family with defined heading scales
 - Spacing: Tailwind units (1, 2, 3, 4, 6, 8, 12) for consistent spacing
-- Layout: GoldenLayout-based panel system with drag/dock/resize capabilities
-- Panel Headers: Light gradient backgrounds with cursor:grab for drag affordance
+- Layout: Custom CSS Grid workspace with resizable panels and preset layouts
+- Panel Headers: Gradient backgrounds with grab cursor for future drag-and-drop support
 
 ## External Dependencies
 

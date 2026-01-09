@@ -3,59 +3,11 @@ import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIPro
 
 export type WorkspacePreset = "default" | "wide-preview" | "tall-timelines" | "compact" | "custom" | "audio";
 
-export type GoldenLayoutConfig = Record<string, unknown>;
-
-export interface LayoutItem {
-  i: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  minW?: number;
-  minH?: number;
-  maxW?: number;
-  maxH?: number;
-  static?: boolean;
+export interface GridLayout {
+  previewHeight: number;
+  toolbarWidth: number;
+  audioHeight: number;
 }
-
-export interface WorkspaceLayout {
-  preview: LayoutItem;
-  toolbar: LayoutItem;
-  timelines: LayoutItem;
-}
-
-export const WORKSPACE_PRESETS: Record<WorkspacePreset, WorkspaceLayout> = {
-  default: {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 4, minW: 6, minH: 2 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 4, w: 11, h: 8, minW: 6, minH: 3 },
-  },
-  "wide-preview": {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 6, minW: 6, minH: 2 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 6, w: 11, h: 6, minW: 6, minH: 3 },
-  },
-  "tall-timelines": {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 3, minW: 6, minH: 2 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 3, w: 11, h: 9, minW: 6, minH: 3 },
-  },
-  compact: {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 2, minW: 6, minH: 2 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 2, w: 11, h: 10, minW: 6, minH: 3 },
-  },
-  custom: {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 4, minW: 6, minH: 2 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 4, w: 11, h: 8, minW: 6, minH: 3 },
-  },
-  audio: {
-    preview: { i: "preview", x: 1, y: 0, w: 11, h: 0, minW: 6, minH: 0 },
-    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
-    timelines: { i: "timelines", x: 1, y: 0, w: 11, h: 12, minW: 6, minH: 3 },
-  },
-};
 
 interface AppState {
   activeTab: "timeline" | "audio";
@@ -126,16 +78,10 @@ interface AppState {
   
   workspacePreset: WorkspacePreset;
   setWorkspacePreset: (preset: WorkspacePreset) => void;
-  customLayout: WorkspaceLayout | null;
-  setCustomLayout: (layout: WorkspaceLayout) => void;
+  customLayout: GridLayout | null;
+  setCustomLayout: (layout: GridLayout) => void;
   isPreviewCollapsed: boolean;
   setPreviewCollapsed: (collapsed: boolean) => void;
-  
-  goldenLayoutConfig: GoldenLayoutConfig | null;
-  setGoldenLayoutConfig: (config: GoldenLayoutConfig | null) => void;
-  
-  savedCustomGoldenLayout: GoldenLayoutConfig | null;
-  setSavedCustomGoldenLayout: (config: GoldenLayoutConfig | null) => void;
   
   panelVisibility: Record<string, boolean>;
   setPanelVisibility: (panel: string, visible: boolean) => void;
@@ -242,17 +188,10 @@ export const useAppStore = create<AppState>((set) => ({
   customLayout: null,
   setCustomLayout: (layout) => set({ 
     customLayout: layout, 
-    savedCustomGoldenLayout: layout as unknown as GoldenLayoutConfig,
     workspacePreset: "custom" 
   }),
   isPreviewCollapsed: false,
   setPreviewCollapsed: (collapsed) => set({ isPreviewCollapsed: collapsed }),
-  
-  goldenLayoutConfig: null,
-  setGoldenLayoutConfig: (config) => set({ goldenLayoutConfig: config }),
-  
-  savedCustomGoldenLayout: null,
-  setSavedCustomGoldenLayout: (config) => set({ savedCustomGoldenLayout: config }),
   
   panelVisibility: {
     RenderPreview: true,
