@@ -1,6 +1,55 @@
 import { create } from "zustand";
 import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
 
+export type WorkspacePreset = "default" | "wide-preview" | "tall-timelines" | "compact" | "custom";
+
+export interface LayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+  maxW?: number;
+  maxH?: number;
+  static?: boolean;
+}
+
+export interface WorkspaceLayout {
+  preview: LayoutItem;
+  toolbar: LayoutItem;
+  timelines: LayoutItem;
+}
+
+export const WORKSPACE_PRESETS: Record<WorkspacePreset, WorkspaceLayout> = {
+  default: {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 4, minW: 6, minH: 2 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 4, w: 11, h: 8, minW: 6, minH: 3 },
+  },
+  "wide-preview": {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 6, minW: 6, minH: 2 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 6, w: 11, h: 6, minW: 6, minH: 3 },
+  },
+  "tall-timelines": {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 3, minW: 6, minH: 2 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 3, w: 11, h: 9, minW: 6, minH: 3 },
+  },
+  compact: {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 2, minW: 6, minH: 2 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 2, w: 11, h: 10, minW: 6, minH: 3 },
+  },
+  custom: {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 4, minW: 6, minH: 2 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 4, w: 11, h: 8, minW: 6, minH: 3 },
+  },
+};
+
 interface AppState {
   activeTab: "timeline" | "audio";
   setActiveTab: (tab: "timeline" | "audio") => void;
@@ -67,6 +116,13 @@ interface AppState {
   
   zoomLevel: number;
   setZoomLevel: (zoom: number) => void;
+  
+  workspacePreset: WorkspacePreset;
+  setWorkspacePreset: (preset: WorkspacePreset) => void;
+  customLayout: WorkspaceLayout | null;
+  setCustomLayout: (layout: WorkspaceLayout) => void;
+  isPreviewCollapsed: boolean;
+  setPreviewCollapsed: (collapsed: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -163,4 +219,11 @@ export const useAppStore = create<AppState>((set) => ({
   
   zoomLevel: 1,
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
+  
+  workspacePreset: "default",
+  setWorkspacePreset: (preset) => set({ workspacePreset: preset }),
+  customLayout: null,
+  setCustomLayout: (layout) => set({ customLayout: layout, workspacePreset: "custom" }),
+  isPreviewCollapsed: false,
+  setPreviewCollapsed: (collapsed) => set({ isPreviewCollapsed: collapsed }),
 }));

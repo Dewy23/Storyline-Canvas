@@ -1,11 +1,56 @@
-import { Film, Music, Download, Settings, Moon, Sun } from "lucide-react";
+import { Film, Music, Download, Settings, Moon, Sun, Layout, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppStore } from "@/lib/store";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useAppStore, WORKSPACE_PRESETS, type WorkspacePreset } from "@/lib/store";
 import { useTheme } from "@/components/theme-provider";
+import { useToast } from "@/hooks/use-toast";
+
+const PRESET_LABELS: Record<WorkspacePreset, string> = {
+  default: "Default",
+  "wide-preview": "Wide Preview",
+  "tall-timelines": "Tall Timelines",
+  compact: "Compact",
+  custom: "Custom",
+};
 
 export function Toolbar() {
-  const { activeTab, setActiveTab, setSettingsOpen, setExportOpen } = useAppStore();
+  const { 
+    activeTab, setActiveTab, setSettingsOpen, setExportOpen,
+    workspacePreset, setWorkspacePreset, customLayout, setCustomLayout,
+  } = useAppStore();
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
+
+  const handlePresetChange = (preset: WorkspacePreset) => {
+    setWorkspacePreset(preset);
+    toast({
+      title: "Workspace updated",
+      description: `Switched to ${PRESET_LABELS[preset]} layout`,
+    });
+  };
+
+  const handleSaveLayout = () => {
+    const current = customLayout || WORKSPACE_PRESETS[workspacePreset];
+    setCustomLayout(current);
+    toast({
+      title: "Layout saved",
+      description: "Current layout saved as custom preset",
+    });
+  };
+
+  const handleResetLayout = () => {
+    setWorkspacePreset("default");
+    toast({
+      title: "Layout reset",
+      description: "Workspace reset to default layout",
+    });
+  };
 
   return (
     <header className="h-14 border-b flex items-center justify-between px-4 gap-4 bg-card">
@@ -39,6 +84,38 @@ export function Toolbar() {
           <Music className="w-4 h-4" />
           <span className="hidden sm:inline">Audio</span>
         </Button>
+
+        <div className="w-px h-6 bg-border mx-2" />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2" data-testid="button-workspace">
+              <Layout className="w-4 h-4" />
+              <span className="hidden sm:inline">Workspace</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center">
+            {(Object.keys(PRESET_LABELS) as WorkspacePreset[]).filter(p => p !== "custom").map((preset) => (
+              <DropdownMenuItem 
+                key={preset}
+                onClick={() => handlePresetChange(preset)}
+                className={workspacePreset === preset ? "bg-accent" : ""}
+                data-testid={`workspace-preset-${preset}`}
+              >
+                {PRESET_LABELS[preset]}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSaveLayout} data-testid="workspace-save">
+              <Save className="w-4 h-4 mr-2" />
+              Save Current Layout
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleResetLayout} data-testid="workspace-reset">
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset to Default
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
 
       <div className="flex items-center gap-2">

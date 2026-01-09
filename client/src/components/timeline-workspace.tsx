@@ -2,12 +2,14 @@ import { useCallback, useRef, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { TimelineBranch } from "./timeline-branch";
 import { TimelineToolbar } from "./timeline-toolbar";
 import { RenderPreview } from "./render-preview";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, WORKSPACE_PRESETS } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { Tile, Timeline } from "@shared/schema";
 
 interface GenerationResult {
@@ -24,6 +26,7 @@ export function TimelineWorkspace() {
   const { 
     timelines, tiles,
     addTimeline, addTile, updateTile, removeTimeline, removeTile,
+    workspacePreset, isPreviewCollapsed, setPreviewCollapsed,
   } = useAppStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -31,6 +34,25 @@ export function TimelineWorkspace() {
   
   const tilesRef = useRef(tiles);
   tilesRef.current = tiles;
+
+  // Get panel sizes from preset
+  const getPresetSizes = () => {
+    const preset = WORKSPACE_PRESETS[workspacePreset];
+    const totalHeight = preset.preview.h + preset.timelines.h;
+    const previewPercent = Math.round((preset.preview.h / totalHeight) * 100);
+    const timelinesPercent = 100 - previewPercent;
+    const toolbarPercent = Math.round((preset.toolbar.w / 12) * 100);
+    const mainPercent = 100 - toolbarPercent;
+    
+    return {
+      toolbar: toolbarPercent,
+      main: mainPercent,
+      preview: previewPercent,
+      timelines: timelinesPercent,
+    };
+  };
+
+  const sizes = getPresetSizes();
 
   // Poll for job status
   useEffect(() => {
@@ -159,7 +181,6 @@ export function TimelineWorkspace() {
     onSuccess: ({ tileId, result, tile, provider }) => {
       const currentTiles = tilesRef.current;
       
-      // Check if this is an async job that needs polling
       if (result.jobId && result.status === "processing") {
         setPendingJobs((prev) => {
           const next = new Map(prev);
@@ -173,7 +194,6 @@ export function TimelineWorkspace() {
         return;
       }
       
-      // Check for errors
       if (!result.success || result.error) {
         updateTile(tileId, { isGenerating: false });
         toast({
@@ -311,44 +331,99 @@ export function TimelineWorkspace() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel defaultSize={6} minSize={4} maxSize={10}>
-        <TimelineToolbar />
+      <ResizablePanel 
+        defaultSize={sizes.toolbar} 
+        minSize={4} 
+        maxSize={15}
+        className="bg-card"
+      >
+        <div className="h-full flex flex-col">
+          <TimelineToolbar />
+          {isPreviewCollapsed && (
+            <div className="p-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setPreviewCollapsed(false)}
+                data-testid="button-expand-preview"
+              >
+                <ChevronDown className="w-4 h-4" />
+                Preview
+              </Button>
+            </div>
+          )}
+        </div>
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={94} minSize={60}>
+      <ResizablePanel defaultSize={sizes.main} minSize={60}>
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={25} minSize={15} maxSize={50} collapsible>
-            <RenderPreview />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <ResizablePanel defaultSize={75} minSize={30}>
-            <ScrollArea className="h-full">
-              <div className="min-w-max">
-                {sortedTimelines.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                    <p>Loading timeline...</p>
+          {!isPreviewCollapsed && (
+            <>
+              <ResizablePanel 
+                defaultSize={sizes.preview} 
+                minSize={10} 
+                maxSize={60} 
+                collapsible
+                onCollapse={() => setPreviewCollapsed(true)}
+              >
+                <div className="h-full flex flex-col">
+                  <div className="flex items-center justify-between px-3 py-1 bg-muted/30 border-b">
+                    <span className="text-xs font-medium text-muted-foreground">Render Preview</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setPreviewCollapsed(true)}
+                      data-testid="button-collapse-preview"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </Button>
                   </div>
-                ) : (
-                  sortedTimelines.map((timeline, index) => (
-                    <TimelineBranch
-                      key={timeline.id}
-                      timeline={timeline}
-                      tiles={tiles}
-                      onGenerate={handleGenerate}
-                      onDeleteTimeline={handleDeleteTimeline}
-                      onFrameSliderChange={handleFrameSliderChange}
-                      onAddSegment={handleAddSegment}
-                      isFirst={index === 0}
-                    />
-                  ))
-                )}
+                  <div className="flex-1 overflow-hidden">
+                    <RenderPreview />
+                  </div>
+                </div>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+            </>
+          )}
+
+          <ResizablePanel 
+            defaultSize={isPreviewCollapsed ? 100 : sizes.timelines} 
+            minSize={30}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between px-3 py-1 bg-muted/30 border-b">
+                <span className="text-xs font-medium text-muted-foreground">Timelines</span>
               </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+              <ScrollArea className="flex-1">
+                <div className="min-w-max">
+                  {sortedTimelines.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                      <p>Loading timeline...</p>
+                    </div>
+                  ) : (
+                    sortedTimelines.map((timeline, index) => (
+                      <TimelineBranch
+                        key={timeline.id}
+                        timeline={timeline}
+                        tiles={tiles}
+                        onGenerate={handleGenerate}
+                        onDeleteTimeline={handleDeleteTimeline}
+                        onFrameSliderChange={handleFrameSliderChange}
+                        onAddSegment={handleAddSegment}
+                        isFirst={index === 0}
+                      />
+                    ))
+                  )}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>
