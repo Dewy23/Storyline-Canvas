@@ -378,36 +378,42 @@
 }
 
 /* Clean splitters - cursor-based resizing like VS Code/Figma 
-   15px hit area for reliable hover detection on all devices */
+   20px hit area for reliable hover detection on all devices */
 .lm_splitter {
   background: transparent !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 100 !important;
+  z-index: 9999 !important;
   transition: background 0.1s ease !important;
   pointer-events: auto !important;
+  touch-action: none !important;
 }
 
 .lm_splitter:hover {
-  background: rgba(100, 149, 237, 0.25) !important;
+  background: rgba(100, 149, 237, 0.2) !important;
 }
 
-.lm_splitter:active {
-  background: rgba(100, 149, 237, 0.4) !important;
+.lm_splitter:active,
+.lm_splitter.lm_dragging {
+  background: rgba(100, 149, 237, 0.35) !important;
 }
 
-/* Vertical splitter (between left/right panels) - 15px wide for reliable targeting */
+/* Vertical splitter (between left/right panels) - 20px wide for reliable targeting */
 .lm_splitter.lm_vertical {
-  width: 15px !important;
-  min-width: 15px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
   cursor: col-resize !important;
+  margin: 0 -10px !important;
 }
 
-/* Horizontal splitter (between top/bottom panels) - 15px tall for reliable targeting */
+/* Horizontal splitter (between top/bottom panels) - 20px tall for reliable targeting */
 .lm_splitter.lm_horizontal {
-  height: 15px !important;
-  min-height: 15px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
   cursor: row-resize !important;
+  margin: -10px 0 !important;
 }
 
 /* Subtle center line indicator - visible separator line */
@@ -415,7 +421,7 @@
   content: "";
   position: absolute;
   background: hsl(220 10% 40%);
-  transition: background 0.1s ease;
+  transition: background 0.1s ease, transform 0.1s ease;
   pointer-events: none;
 }
 
@@ -425,6 +431,11 @@
 
 .lm_splitter:hover::after {
   background: hsl(var(--primary));
+  transform: translateX(-50%) scaleX(1.5);
+}
+
+.lm_splitter.lm_horizontal:hover::after {
+  transform: translateY(-50%) scaleY(1.5);
 }
 
 /* Vertical splitter - thin vertical line in center */
@@ -445,9 +456,17 @@
   transform: translateY(-50%);
 }
 
-/* Ensure splitters are always above panel content */
-.lm_goldenlayout > .lm_item {
+/* Ensure splitters are always above panel content and row/column containers */
+.lm_goldenlayout .lm_item,
+.lm_goldenlayout .lm_row,
+.lm_goldenlayout .lm_column,
+.lm_goldenlayout .lm_stack {
   overflow: visible !important;
+}
+
+/* Force splitters to be on top of everything */
+.lm_goldenlayout .lm_splitter {
+  z-index: 9999 !important;
 }
 
 .lm_dropTargetIndicator {
