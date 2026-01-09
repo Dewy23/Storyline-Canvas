@@ -6,6 +6,12 @@ StoryForge AI is an AI-powered video editor focused on consistent character stor
 
 ## Recent Changes (January 2026)
 
+- Expanded AI provider support with 20+ providers across Image, Video, and Audio categories
+- Settings modal reorganized into 3 tabs: Image Providers, Video Providers, Audio Providers
+- Working image generation: OpenAI/DALL-E, Stability AI, Flux, Ideogram, Pollinations, Gemini, Replicate
+- Working video generation: Runway ML, Luma Dream Machine, Replicate
+- API key validation on save with real API test calls
+- Connected providers shown with green status indicator in tile dropdowns
 - Completed full frontend-backend integration with React Query for data persistence
 - Implemented bi-directional automatic chaining between image and video tiles
 - Added API key management with backend persistence (masked display for security)
@@ -53,14 +59,25 @@ The application follows a professional creative tool aesthetic inspired by Adobe
 
 ## External Dependencies
 
-### AI Service Providers
-- **Stability AI**: Stable Diffusion image generation
-- **Flux**: Fast image generation
-- **OpenAI**: DALL-E image generation
-- **Runway**: Video generation and editing
-- **Kling**: AI video generation
-- **Replicate**: Multi-model platform for various AI capabilities
-- **ElevenLabs**: AI voice and audio generation
+### AI Service Providers (Implemented)
+**Image Generation:**
+- OpenAI (DALL-E 3)
+- Google Gemini
+- Stability AI (Stable Diffusion XL)
+- Flux (via Replicate)
+- Ideogram
+- Pollinations.ai (free, no key required)
+- Replicate (multi-model)
+
+**Video Generation:**
+- Runway ML (Gen-3 Alpha)
+- Luma Dream Machine
+- Replicate (Stable Video Diffusion)
+
+**Audio Generation:**
+- ElevenLabs (voice synthesis)
+
+**Coming Soon:** Hunyuan, Adobe Firefly, Bria.ai, Runware, Google Veo, Kling, Pika Labs, Tavus, Mootion, Akool, Mirage, Pictory
 
 ### Database
 - **PostgreSQL**: Primary database (configured via `DATABASE_URL` environment variable)

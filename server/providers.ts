@@ -14,8 +14,9 @@ interface JobStatus {
   progress?: number;
 }
 
-const IMAGE_PROVIDERS = ["stability", "flux", "openai", "dalle3", "ideogram", "replicate"];
-const VIDEO_PROVIDERS = ["runway", "kling", "pika", "luma", "replicate"];
+// Provider categorization
+export const IMAGE_PROVIDERS = ["openai", "gemini", "stability", "flux", "ideogram", "hunyuan", "firefly", "bria", "pollinations", "runware", "replicate", "dalle3"];
+export const VIDEO_PROVIDERS = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
 
 export async function validateApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; error?: string }> {
   try {
@@ -37,6 +38,12 @@ export async function validateApiKey(provider: string, apiKey: string): Promise<
         return { valid: false, error: "Invalid API key" };
       }
       
+      case "gemini": {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
+        if (response.ok) return { valid: true };
+        return { valid: false, error: "Invalid API key" };
+      }
+      
       case "replicate":
       case "flux": {
         const response = await fetch("https://api.replicate.com/v1/account", {
@@ -53,11 +60,46 @@ export async function validateApiKey(provider: string, apiKey: string): Promise<
             "X-Runway-Version": "2024-11-06",
           },
         });
-        if (response.ok || response.status === 401) {
-          return { valid: response.ok };
-        }
+        if (response.ok) return { valid: true };
+        if (response.status === 401) return { valid: false, error: "Invalid API key" };
         return { valid: apiKey.length > 20 };
       }
+      
+      case "ideogram": {
+        const response = await fetch("https://api.ideogram.ai/describe", {
+          method: "POST",
+          headers: {
+            "Api-Key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image_url: "https://via.placeholder.com/1" }),
+        });
+        if (response.status === 401 || response.status === 403) {
+          return { valid: false, error: "Invalid API key" };
+        }
+        return { valid: true };
+      }
+      
+      // Providers that need basic validation (no public validation endpoint)
+      case "hunyuan":
+      case "firefly":
+      case "bria":
+      case "pollinations":
+      case "runware":
+      case "veo":
+      case "kling":
+      case "pika":
+      case "luma":
+      case "tavus":
+      case "mootion":
+      case "akool":
+      case "mirage":
+      case "pictory":
+        // Basic validation - key exists and has reasonable length
+        if (apiKey.length >= 10) {
+          return { valid: true };
+        }
+        return { valid: false, error: "API key too short" };
       
       default:
         return { valid: apiKey.length > 10 };
@@ -77,6 +119,8 @@ export async function generateImage(
   if (!apiKey) {
     return { success: false, error: `No API key configured for ${provider}` };
   }
+
+  console.log(`[Provider] Generating image with ${provider}`);
 
   try {
     switch (provider) {
@@ -148,6 +192,41 @@ export async function generateImage(
         return { success: false, error: "No image returned" };
       }
 
+      case "gemini": {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: `Generate an image: ${prompt}` }]
+              }],
+              generationConfig: {
+                responseModalities: ["TEXT", "IMAGE"]
+              }
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.text();
+          console.error("[Gemini] Error:", error);
+          return { success: false, error: `Gemini API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        const imagePart = data.candidates?.[0]?.content?.parts?.find((p: { inlineData?: { mimeType: string; data: string } }) => p.inlineData);
+        
+        if (imagePart?.inlineData) {
+          return {
+            success: true,
+            mediaUrl: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+          };
+        }
+        return { success: false, error: "No image returned from Gemini" };
+      }
+
       case "flux":
       case "replicate": {
         const response = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", {
@@ -191,8 +270,51 @@ export async function generateImage(
         return { success: false, error: "No prediction ID returned" };
       }
 
+      case "ideogram": {
+        const response = await fetch("https://api.ideogram.ai/generate", {
+          method: "POST",
+          headers: {
+            "Api-Key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image_request: {
+              prompt: prompt,
+              aspect_ratio: "ASPECT_16_9",
+              model: "V_2",
+              magic_prompt_option: "AUTO",
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          console.error("[Ideogram] Error:", error);
+          return { success: false, error: `Ideogram API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        const imageUrl = data.data?.[0]?.url;
+        
+        if (imageUrl) {
+          return { success: true, mediaUrl: imageUrl };
+        }
+        return { success: false, error: "No image returned" };
+      }
+
+      case "pollinations": {
+        // Pollinations has a simple URL-based API
+        const encodedPrompt = encodeURIComponent(prompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+        return { success: true, mediaUrl: imageUrl };
+      }
+
       default:
-        return { success: false, error: `Provider ${provider} not implemented` };
+        // Handle unimplemented providers gracefully
+        return { 
+          success: false, 
+          error: `${provider} integration is not yet available. Please use one of these providers: OpenAI, Stability AI, Flux, Ideogram, Gemini, or Pollinations.` 
+        };
     }
   } catch (error) {
     console.error(`[${provider}] Generation error:`, error);
@@ -210,11 +332,13 @@ export async function generateVideo(
     return { success: false, error: `No API key configured for ${provider}` };
   }
 
+  console.log(`[Provider] Generating video with ${provider}, reference: ${referenceImageUrl ? 'yes' : 'no'}`);
+
   try {
     switch (provider) {
       case "runway": {
         if (!referenceImageUrl) {
-          return { success: false, error: "Runway requires a reference image for image-to-video" };
+          return { success: false, error: "Runway requires a reference image for image-to-video generation" };
         }
         
         const response = await fetch("https://api.runwayml.com/v1/image_to_video", {
@@ -256,14 +380,14 @@ export async function generateVideo(
           modelInput.image = referenceImageUrl;
         }
 
-        const response = await fetch("https://api.replicate.com/v1/predictions", {
+        const response = await fetch("https://api.replicate.com/v1/models/stability-ai/stable-video-diffusion/predictions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Token ${apiKey}`,
+            "Prefer": "wait=60",
           },
           body: JSON.stringify({
-            version: "stability-ai/stable-video-diffusion",
             input: modelInput,
           }),
         });
@@ -276,14 +400,49 @@ export async function generateVideo(
 
         const prediction = await response.json();
         
+        if (prediction.status === "succeeded" && prediction.output) {
+          const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+          return { success: true, mediaUrl: outputUrl };
+        }
+        
         return {
           success: true,
           jobId: prediction.id,
         };
       }
 
+      case "luma": {
+        const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            keyframes: referenceImageUrl ? {
+              frame0: { type: "image", url: referenceImageUrl }
+            } : undefined,
+            aspect_ratio: "16:9",
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          console.error("[Luma] Error:", error);
+          return { success: false, error: `Luma API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        return { success: true, jobId: data.id };
+      }
+
       default:
-        return { success: false, error: `Video provider ${provider} not implemented` };
+        // Handle unimplemented providers gracefully
+        return { 
+          success: false, 
+          error: `${provider} video integration is not yet available. Please use Runway or Luma for video generation.` 
+        };
     }
   } catch (error) {
     console.error(`[${provider}] Video generation error:`, error);
@@ -340,6 +499,28 @@ export async function checkJobStatus(provider: string, jobId: string, apiKey: st
           return { status: "completed", mediaUrl: output };
         } else if (data.status === "failed") {
           return { status: "failed", error: data.error || "Generation failed" };
+        } else {
+          return { status: "processing" };
+        }
+      }
+
+      case "luma": {
+        const response = await fetch(`https://api.lumalabs.ai/dream-machine/v1/generations/${jobId}`, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          return { status: "failed", error: "Failed to check status" };
+        }
+
+        const data = await response.json();
+        
+        if (data.state === "completed") {
+          return { status: "completed", mediaUrl: data.assets?.video };
+        } else if (data.state === "failed") {
+          return { status: "failed", error: data.failure_reason || "Generation failed" };
         } else {
           return { status: "processing" };
         }

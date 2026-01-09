@@ -2,17 +2,33 @@ import { z } from "zod";
 
 // AI Provider types
 export const aiProviders = [
-  "stability",
-  "runway",
-  "kling",
-  "flux",
-  "elevenlabs",
+  // Image providers
   "openai",
-  "replicate",
+  "gemini",
+  "stability",
+  "flux",
   "ideogram",
-  "dalle3",
+  "hunyuan",
+  "firefly",
+  "bria",
+  "pollinations",
+  "runware",
+  // Video providers
+  "runway",
+  "veo",
+  "kling",
   "pika",
   "luma",
+  "tavus",
+  "mootion",
+  "akool",
+  "mirage",
+  "pictory",
+  // Multi/Audio providers
+  "replicate",
+  "elevenlabs",
+  // Legacy
+  "dalle3",
 ] as const;
 
 export type AIProvider = (typeof aiProviders)[number];

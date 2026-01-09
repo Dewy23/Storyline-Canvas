@@ -21,21 +21,37 @@ interface TileProps {
 }
 
 const providerLabels: Record<AIProvider, string> = {
-  flux: "Flux",
+  // Image providers
+  openai: "OpenAI (DALL-E)",
+  gemini: "Google Gemini",
   stability: "Stability AI",
-  dalle3: "DALL·E 3",
+  flux: "Flux",
   ideogram: "Ideogram",
-  runway: "Runway",
+  hunyuan: "Hunyuan",
+  firefly: "Adobe Firefly",
+  bria: "Bria.ai",
+  pollinations: "Pollinations",
+  runware: "Runware",
+  // Video providers
+  runway: "Runway ML",
+  veo: "Google Veo",
   kling: "Kling",
-  pika: "Pika",
-  luma: "Luma Dream Machine",
-  elevenlabs: "ElevenLabs",
-  openai: "OpenAI",
+  pika: "Pika Labs",
+  luma: "Luma",
+  tavus: "Tavus",
+  mootion: "Mootion",
+  akool: "Akool",
+  mirage: "Mirage",
+  pictory: "Pictory",
+  // Multi/Audio
   replicate: "Replicate",
+  elevenlabs: "ElevenLabs",
+  dalle3: "DALL-E 3",
 };
 
-const imageProviders: AIProvider[] = ["stability", "flux", "openai", "dalle3", "ideogram", "replicate"];
-const videoProviders: AIProvider[] = ["runway", "kling", "pika", "luma", "replicate"];
+// Providers with working implementations
+const imageProviders: AIProvider[] = ["openai", "stability", "flux", "ideogram", "pollinations", "gemini", "replicate"];
+const videoProviders: AIProvider[] = ["runway", "luma", "replicate"];
 
 export function Tile({
   tile,
