@@ -216,6 +216,13 @@ export function GoldenWorkspace() {
 
     layout.loadLayout(config);
 
+    // Set initial size after a small delay to ensure container is measured
+    requestAnimationFrame(() => {
+      if (containerRef.current && layout) {
+        layout.setSize(containerRef.current.offsetWidth, containerRef.current.offsetHeight);
+      }
+    });
+
     layout.on("stateChanged", () => {
       if (prevPresetRef.current !== "custom") {
         setWorkspacePreset("custom");
