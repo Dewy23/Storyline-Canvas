@@ -348,35 +348,40 @@ export async function registerRoutes(
     referenceImageUrl: z.string().optional(),
   });
 
+  // Free providers that don't require API keys
+  const FREE_IMAGE_PROVIDERS = ["pollinations"];
+
   app.post("/api/generate/image", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
-      let provider = data.provider || "stability";
+      let provider = data.provider || "pollinations";
       
       const settings = await storage.getApiSettings();
-      const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
       
-      if (!providerSetting) {
-        const fallbackProvider = settings.find((s) => 
-          ["stability", "flux", "openai", "dalle3", "replicate"].includes(s.provider) && s.isConnected
-        );
+      // Free providers don't need API key validation
+      const isFreeProvider = FREE_IMAGE_PROVIDERS.includes(provider);
+      
+      if (!isFreeProvider) {
+        const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
         
-        if (!fallbackProvider) {
-          console.log(`[Generate Image] No connected provider, using placeholder`);
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-          return res.json({
-            success: true,
-            mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
-            provider: "placeholder",
-            message: "No AI provider connected - showing placeholder image",
-          });
+        if (!providerSetting) {
+          const fallbackProvider = settings.find((s) => 
+            ["stability", "flux", "openai", "dalle3", "replicate"].includes(s.provider) && s.isConnected
+          );
+          
+          if (!fallbackProvider) {
+            // Default to Pollinations as free fallback
+            provider = "pollinations";
+          } else {
+            provider = fallbackProvider.provider;
+          }
         }
-        provider = fallbackProvider.provider;
       }
       
       console.log(`[Generate Image] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
       
-      const apiKey = providerSetting?.apiKey || settings.find((s) => s.provider === provider)?.apiKey || "";
+      // Free providers pass empty string, they don't need keys
+      const apiKey = isFreeProvider ? "" : (settings.find((s) => s.provider === provider)?.apiKey || "");
       
       const result = await generateImage(provider, data.prompt, apiKey, data.referenceImageUrl);
       

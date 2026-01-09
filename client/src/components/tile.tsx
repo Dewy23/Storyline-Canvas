@@ -30,7 +30,7 @@ const providerLabels: Record<AIProvider, string> = {
   hunyuan: "Hunyuan",
   firefly: "Adobe Firefly",
   bria: "Bria.ai",
-  pollinations: "Pollinations",
+  pollinations: "Pollinations.ai",
   runware: "Runware",
   // Video providers
   runway: "Runway ML",
@@ -47,10 +47,14 @@ const providerLabels: Record<AIProvider, string> = {
   replicate: "Replicate",
   elevenlabs: "ElevenLabs",
   dalle3: "DALL-E 3",
+  huggingface: "Hugging Face",
 };
 
+// Free providers that don't require API keys
+const FREE_PROVIDERS: AIProvider[] = ["pollinations"];
+
 // All available providers (filter by connected status at runtime)
-const imageProviders: AIProvider[] = ["openai", "gemini", "stability", "flux", "ideogram", "hunyuan", "firefly", "bria", "pollinations", "runware", "replicate"];
+const imageProviders: AIProvider[] = ["pollinations", "openai", "gemini", "stability", "flux", "ideogram", "huggingface", "hunyuan", "firefly", "bria", "runware", "replicate"];
 const videoProviders: AIProvider[] = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
 
 export function Tile({
@@ -69,12 +73,18 @@ export function Tile({
   const isSelected = selectedTileId === tile.id;
   const allProviders = tile.type === "image" ? imageProviders : videoProviders;
   
-  // Only show connected providers in dropdown
-  const connectedProviders = allProviders.filter((p) => 
-    apiSettings.some((s) => s.provider === p && s.isConnected)
+  // Free providers for this tile type (always available)
+  const freeProvidersForType = FREE_PROVIDERS.filter(p => allProviders.includes(p));
+  
+  // Connected key-based providers
+  const connectedKeyProviders = allProviders.filter((p) => 
+    !FREE_PROVIDERS.includes(p) && apiSettings.some((s) => s.provider === p && s.isConnected)
   );
   
-  const hasConnectedProviders = connectedProviders.length > 0;
+  // Combined: free providers first, then connected key-based providers
+  const availableProviders = [...freeProvidersForType, ...connectedKeyProviders];
+  
+  const hasAvailableProviders = availableProviders.length > 0;
 
   const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
   const hasAboveImage = tile.type === "video" && aboveImageTile?.mediaUrl;
@@ -90,17 +100,17 @@ export function Tile({
     },
   });
 
-  // Auto-select first connected provider when tile.provider is invalid or missing
+  // Auto-select first available provider when tile.provider is invalid or missing
   useEffect(() => {
-    if (hasConnectedProviders) {
-      const currentProviderIsValid = tile.provider && connectedProviders.includes(tile.provider);
+    if (hasAvailableProviders) {
+      const currentProviderIsValid = tile.provider && availableProviders.includes(tile.provider);
       if (!currentProviderIsValid) {
-        const firstConnected = connectedProviders[0];
-        updateTile(tile.id, { provider: firstConnected });
-        updateTileMutation.mutate({ id: tile.id, updates: { provider: firstConnected } });
+        const firstAvailable = availableProviders[0];
+        updateTile(tile.id, { provider: firstAvailable });
+        updateTileMutation.mutate({ id: tile.id, updates: { provider: firstAvailable } });
       }
     }
-  }, [hasConnectedProviders, connectedProviders.join(','), tile.id, tile.provider]);
+  }, [hasAvailableProviders, availableProviders.join(','), tile.id, tile.provider]);
 
   const handlePromptChange = (value: string) => {
     updateTile(tile.id, { prompt: value });
@@ -275,24 +285,33 @@ export function Tile({
             </TabsContent>
 
             <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
-              {hasConnectedProviders ? (
+              {hasAvailableProviders ? (
                 <>
                   <Select
-                    value={tile.provider && connectedProviders.includes(tile.provider) ? tile.provider : connectedProviders[0]}
+                    value={tile.provider && availableProviders.includes(tile.provider) ? tile.provider : availableProviders[0]}
                     onValueChange={handleProviderChange}
                   >
                     <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
                       <SelectValue placeholder="Select provider" />
                     </SelectTrigger>
                     <SelectContent>
-                      {connectedProviders.map((provider) => (
-                        <SelectItem key={provider} value={provider} className="text-xs">
-                          <span className="flex items-center gap-2">
-                            {providerLabels[provider]}
-                            <span className="w-2 h-2 rounded-full bg-green-500" />
-                          </span>
-                        </SelectItem>
-                      ))}
+                      {availableProviders.map((provider) => {
+                        const isFree = FREE_PROVIDERS.includes(provider);
+                        return (
+                          <SelectItem key={provider} value={provider} className="text-xs">
+                            <span className="flex items-center gap-2">
+                              {providerLabels[provider]}
+                              {isFree ? (
+                                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-500/20 text-green-600 dark:text-green-400 rounded">
+                                  Free
+                                </span>
+                              ) : (
+                                <span className="w-2 h-2 rounded-full bg-green-500" title="API key connected" />
+                              )}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <Textarea
@@ -327,9 +346,9 @@ export function Tile({
                     <Settings className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">No {tile.type} providers connected</p>
+                    <p className="text-sm font-medium">No {tile.type} providers available</p>
                     <p className="text-xs text-muted-foreground">
-                      Add an API key in Settings to start generating
+                      Add an API key in Settings to generate {tile.type === "video" ? "videos" : "content"}
                     </p>
                   </div>
                   <Button

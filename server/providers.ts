@@ -118,13 +118,17 @@ export async function validateApiKey(provider: string, apiKey: string): Promise<
   }
 }
 
+// Free providers that don't require API keys
+const FREE_IMAGE_PROVIDERS = ["pollinations"];
+
 export async function generateImage(
   provider: string,
   prompt: string,
   apiKey: string,
   referenceImageUrl?: string
 ): Promise<GenerationResult> {
-  if (!apiKey) {
+  // Free providers don't need API keys
+  if (!apiKey && !FREE_IMAGE_PROVIDERS.includes(provider)) {
     return { success: false, error: `No API key configured for ${provider}` };
   }
 
