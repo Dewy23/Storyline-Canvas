@@ -355,7 +355,7 @@ export function GoldenWorkspace() {
     } catch (e) {
       console.warn("Could not load preset layout:", e);
     }
-  }, [workspacePreset, goldenLayoutConfig]);
+  }, [workspacePreset, savedCustomGoldenLayout]);
 
   const portalElements = useMemo(() => {
     return Array.from(portals.entries()).map(([id, entry]) => 
