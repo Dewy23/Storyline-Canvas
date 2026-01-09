@@ -67,6 +67,7 @@ function createDefaultConfig(): LayoutConfig {
       showPopoutIcon: false,
       showMaximiseIcon: true,
       showCloseIcon: false,
+      reorderEnabled: true,
     },
   };
 }
@@ -76,6 +77,7 @@ function createPresetConfig(preset: WorkspacePreset): LayoutConfig {
     showPopoutIcon: false,
     showMaximiseIcon: true,
     showCloseIcon: false,
+    reorderEnabled: true,
   };
 
   const presets: Record<WorkspacePreset, LayoutConfig> = {
@@ -160,15 +162,22 @@ function createPresetConfig(preset: WorkspacePreset): LayoutConfig {
 interface PortalEntry {
   container: HTMLElement;
   componentType: PanelType;
+  id: string;
 }
 
 export function GoldenWorkspace() {
   const containerRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<GoldenLayout | null>(null);
+  const portalMapRef = useRef<Map<HTMLElement, PortalEntry>>(new Map());
   const [portals, setPortals] = useState<PortalEntry[]>([]);
+  const portalIdCounter = useRef(0);
   
   const { workspacePreset, setWorkspacePreset, panelVisibility } = useAppStore();
   const prevPresetRef = useRef(workspacePreset);
+
+  const syncPortals = useCallback(() => {
+    setPortals(Array.from(portalMapRef.current.values()));
+  }, []);
 
   const registerComponent = useCallback((
     container: ComponentContainer,
@@ -181,19 +190,25 @@ export function GoldenWorkspace() {
     element.style.overflow = "hidden";
     container.element.appendChild(element);
     
-    setPortals(prev => [...prev, { container: element, componentType }]);
+    const id = `portal-${componentType}-${++portalIdCounter.current}`;
+    const entry: PortalEntry = { container: element, componentType, id };
+    portalMapRef.current.set(element, entry);
+    syncPortals();
     
     container.on("beforeComponentRelease", () => {
-      setPortals(prev => prev.filter(p => p.container !== element));
+      portalMapRef.current.delete(element);
+      syncPortals();
     });
-  }, []);
+  }, [syncPortals]);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const initLayout = useCallback((preset: WorkspacePreset) => {
+    if (!containerRef.current) return null;
 
-    const config = createPresetConfig(workspacePreset);
+    portalMapRef.current.clear();
+    syncPortals();
+
+    const config = createPresetConfig(preset);
     const layout = new GoldenLayout(containerRef.current);
-    layoutRef.current = layout;
 
     Object.keys(PANEL_COMPONENTS).forEach(type => {
       layout.registerComponentFactoryFunction(type, registerComponent);
@@ -208,6 +223,15 @@ export function GoldenWorkspace() {
       }
     });
 
+    return layout;
+  }, [registerComponent, syncPortals, setWorkspacePreset]);
+
+  useEffect(() => {
+    const layout = initLayout(workspacePreset);
+    if (!layout) return;
+    
+    layoutRef.current = layout;
+
     const handleResize = () => {
       if (containerRef.current && layoutRef.current) {
         layoutRef.current.setSize(containerRef.current.offsetWidth, containerRef.current.offsetHeight);
@@ -219,36 +243,25 @@ export function GoldenWorkspace() {
       window.removeEventListener("resize", handleResize);
       layout.destroy();
       layoutRef.current = null;
-      setPortals([]);
+      portalMapRef.current.clear();
+      syncPortals();
     };
   }, []);
 
   useEffect(() => {
     if (workspacePreset !== prevPresetRef.current && workspacePreset !== "custom") {
       prevPresetRef.current = workspacePreset;
-      if (layoutRef.current && containerRef.current) {
+      if (layoutRef.current) {
         layoutRef.current.destroy();
-        setPortals([]);
-        
-        const config = createPresetConfig(workspacePreset);
-        const layout = new GoldenLayout(containerRef.current);
+        layoutRef.current = null;
+      }
+      
+      const layout = initLayout(workspacePreset);
+      if (layout) {
         layoutRef.current = layout;
-
-        Object.keys(PANEL_COMPONENTS).forEach(type => {
-          layout.registerComponentFactoryFunction(type, registerComponent);
-        });
-
-        layout.loadLayout(config);
-
-        layout.on("stateChanged", () => {
-          if (prevPresetRef.current !== "custom") {
-            setWorkspacePreset("custom");
-            prevPresetRef.current = "custom";
-          }
-        });
       }
     }
-  }, [workspacePreset, registerComponent, setWorkspacePreset]);
+  }, [workspacePreset, initLayout]);
 
   return (
     <div 
@@ -256,19 +269,22 @@ export function GoldenWorkspace() {
       className="h-full w-full golden-layout-container"
       data-testid="golden-workspace"
     >
-      {portals.map((portal, index) => {
+      {portals.map((portal) => {
         const Component = PANEL_COMPONENTS[portal.componentType];
         if (!Component) return null;
         
         const isVisible = panelVisibility[portal.componentType] !== false;
-        if (!isVisible) return null;
         
         return createPortal(
-          <div className="h-full w-full overflow-hidden" data-testid={`panel-${portal.componentType.toLowerCase()}`}>
-            <Component />
+          <div 
+            className="h-full w-full overflow-hidden" 
+            data-testid={`panel-${portal.componentType.toLowerCase()}`}
+            style={{ display: isVisible ? 'block' : 'none' }}
+          >
+            {isVisible && <Component />}
           </div>,
           portal.container,
-          `portal-${portal.componentType}-${index}`
+          portal.id
         );
       })}
     </div>

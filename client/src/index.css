@@ -339,6 +339,11 @@
   background: hsl(var(--background) / 0.3) !important;
 }
 
+.lm_tab:active,
+.lm_tab.lm_active:active {
+  cursor: grabbing !important;
+}
+
 .lm_tab:hover {
   color: hsl(var(--foreground)) !important;
 }
