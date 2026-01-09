@@ -377,67 +377,77 @@
   border: none !important;
 }
 
-/* Clean splitters - cursor-based resizing like VS Code/Figma */
+/* Clean splitters - cursor-based resizing like VS Code/Figma 
+   15px hit area for reliable hover detection on all devices */
 .lm_splitter {
   background: transparent !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 10 !important;
-  transition: background 0.15s ease !important;
+  z-index: 100 !important;
+  transition: background 0.1s ease !important;
+  pointer-events: auto !important;
 }
 
 .lm_splitter:hover {
-  background: hsl(var(--primary) / 0.4) !important;
+  background: rgba(100, 149, 237, 0.25) !important;
 }
 
 .lm_splitter:active {
-  background: hsl(var(--primary) / 0.6) !important;
+  background: rgba(100, 149, 237, 0.4) !important;
 }
 
-/* Vertical splitter (between left/right panels) - 10px wide for easy targeting */
+/* Vertical splitter (between left/right panels) - 15px wide for reliable targeting */
 .lm_splitter.lm_vertical {
-  width: 10px !important;
-  cursor: ew-resize !important;
+  width: 15px !important;
+  min-width: 15px !important;
+  cursor: col-resize !important;
 }
 
-/* Horizontal splitter (between top/bottom panels) - 10px tall for easy targeting */
+/* Horizontal splitter (between top/bottom panels) - 15px tall for reliable targeting */
 .lm_splitter.lm_horizontal {
-  height: 10px !important;
-  cursor: ns-resize !important;
+  height: 15px !important;
+  min-height: 15px !important;
+  cursor: row-resize !important;
 }
 
-/* Subtle center line indicator - no handles/dots */
+/* Subtle center line indicator - visible separator line */
 .lm_splitter::after {
   content: "";
   position: absolute;
-  background: hsl(220 10% 35%);
-  transition: background 0.15s ease;
+  background: hsl(220 10% 40%);
+  transition: background 0.1s ease;
+  pointer-events: none;
 }
 
 .dark .lm_splitter::after {
-  background: hsl(220 10% 28%);
+  background: hsl(220 10% 30%);
 }
 
 .lm_splitter:hover::after {
-  background: hsl(var(--primary) / 0.8);
+  background: hsl(var(--primary));
 }
 
-/* Vertical splitter - thin vertical line */
+/* Vertical splitter - thin vertical line in center */
 .lm_splitter.lm_vertical::after {
-  width: 1px;
+  width: 2px;
   height: 100%;
   left: 50%;
   top: 0;
   transform: translateX(-50%);
 }
 
-/* Horizontal splitter - thin horizontal line */
+/* Horizontal splitter - thin horizontal line in center */
 .lm_splitter.lm_horizontal::after {
-  height: 1px;
+  height: 2px;
   width: 100%;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
+}
+
+/* Ensure splitters are always above panel content */
+.lm_goldenlayout > .lm_item {
+  overflow: visible !important;
 }
 
 .lm_dropTargetIndicator {
