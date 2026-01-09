@@ -377,71 +377,74 @@
   border: none !important;
 }
 
-/* Clean splitters - cursor-based resizing like VS Code/Figma 
-   30px hit area for reliable hover detection on all devices */
+/* ==========================================================================
+   GoldenLayout Splitters - Full-length hoverable resize handles
+   ========================================================================== */
 
-/* Base splitter styles */
+/* Base splitter - the entire element is the hit area */
 .lm_splitter {
   background: transparent !important;
   opacity: 1 !important;
   position: relative !important;
   z-index: 9999 !important;
-  transition: background 0.1s ease !important;
+  transition: background 0.2s ease !important;
   pointer-events: auto !important;
   touch-action: none !important;
 }
 
-/* Horizontal splitter - between TOP and BOTTOM panels (row-resize cursor ↕) */
-.lm_splitter.lm_horizontal {
-  height: 8px !important;
-  cursor: row-resize !important;
-}
-
-.lm_splitter.lm_horizontal .lm_drag_handle {
-  position: absolute !important;
-  height: 30px !important;
-  width: 100% !important;
-  top: -11px !important;
-  left: 0 !important;
-  cursor: row-resize !important;
-  background: transparent !important;
-}
-
-/* Vertical splitter - between LEFT and RIGHT panels (col-resize cursor ↔) */
+/* Vertical splitter - between LEFT and RIGHT panels 
+   Full height, 12px wide hit area, col-resize cursor ↔ */
 .lm_splitter.lm_vertical {
-  width: 8px !important;
-  cursor: col-resize !important;
-}
-
-.lm_splitter.lm_vertical .lm_drag_handle {
-  position: absolute !important;
-  width: 30px !important;
+  width: 12px !important;
+  min-width: 12px !important;
   height: 100% !important;
-  left: -11px !important;
-  top: 0 !important;
   cursor: col-resize !important;
-  background: transparent !important;
+  padding: 0 10px !important;
+  margin: 0 -5px !important;
+  box-sizing: content-box !important;
 }
 
-/* Hover feedback */
-.lm_splitter:hover,
-.lm_splitter .lm_drag_handle:hover {
-  background: rgba(100, 149, 237, 0.15) !important;
+.lm_splitter.lm_vertical,
+.lm_splitter.lm_vertical > *,
+.lm_splitter.lm_vertical .lm_drag_handle {
+  cursor: col-resize !important;
+}
+
+/* Horizontal splitter - between TOP and BOTTOM panels
+   Full width, 12px tall hit area, row-resize cursor ↕ */
+.lm_splitter.lm_horizontal {
+  height: 12px !important;
+  min-height: 12px !important;
+  width: 100% !important;
+  cursor: row-resize !important;
+  padding: 10px 0 !important;
+  margin: -5px 0 !important;
+  box-sizing: content-box !important;
+}
+
+.lm_splitter.lm_horizontal,
+.lm_splitter.lm_horizontal > *,
+.lm_splitter.lm_horizontal .lm_drag_handle {
+  cursor: row-resize !important;
+}
+
+/* Hover feedback - highlight the FULL separator line */
+.lm_splitter:hover {
+  background: rgba(100, 100, 255, 0.2) !important;
 }
 
 .lm_splitter:active,
-.lm_splitter.lm_dragging,
-.lm_splitter .lm_drag_handle:active {
-  background: rgba(100, 149, 237, 0.3) !important;
+.lm_splitter.lm_dragging {
+  background: rgba(100, 100, 255, 0.35) !important;
 }
 
-/* Subtle center line indicator - visible separator line */
+/* Visible center line indicator */
 .lm_splitter::after {
   content: "";
   position: absolute;
   background: hsl(220 10% 40%);
-  transition: background 0.1s ease;
-  pointer-events: none;
+  transition: background 0.2s ease;
+  pointer-events: none !important;
 }
 
 .dark .lm_splitter::after {
@@ -452,7 +455,7 @@
   background: hsl(var(--primary));
 }
 
-/* Vertical splitter - thin vertical line in center */
+/* Vertical splitter center line - runs full height */
 .lm_splitter.lm_vertical::after {
   width: 2px;
   height: 100%;
@@ -461,7 +464,7 @@
   transform: translateX(-50%);
 }
 
-/* Horizontal splitter - thin horizontal line in center */
+/* Horizontal splitter center line - runs full width */
 .lm_splitter.lm_horizontal::after {
   height: 2px;
   width: 100%;
@@ -470,18 +473,25 @@
   transform: translateY(-50%);
 }
 
-/* Ensure splitters are always above panel content */
+/* Ensure nothing blocks the splitters */
+.lm_goldenlayout,
 .lm_goldenlayout .lm_item,
 .lm_goldenlayout .lm_row,
 .lm_goldenlayout .lm_column,
-.lm_goldenlayout .lm_stack {
+.lm_goldenlayout .lm_stack,
+.lm_goldenlayout .lm_content {
   overflow: visible !important;
 }
 
-/* Force splitters and drag handles to be on top */
-.lm_goldenlayout .lm_splitter,
-.lm_goldenlayout .lm_splitter .lm_drag_handle {
+/* Force splitters to be on top of everything */
+.lm_goldenlayout .lm_splitter {
   z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+/* Remove any pointer-events blocking on child elements */
+.lm_splitter * {
+  pointer-events: inherit !important;
 }
 
 .lm_dropTargetIndicator {
