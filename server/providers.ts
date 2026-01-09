@@ -437,6 +437,152 @@ export async function generateVideo(
         return { success: true, jobId: data.id };
       }
 
+      case "veo": {
+        // Google Veo uses the Gemini API with video generation capability
+        // Using veo-2.0-generate-001 model for video generation
+        const requestBody: Record<string, unknown> = {
+          contents: [{
+            role: "user",
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            responseModalities: ["VIDEO"],
+            videoDurationSeconds: 5
+          }
+        };
+
+        // If reference image provided, include it for image-to-video
+        if (referenceImageUrl) {
+          const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+          
+          // Check if it's a base64 data URL or a regular URL
+          if (referenceImageUrl.startsWith('data:')) {
+            const matches = referenceImageUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches) {
+              parts.unshift({
+                inlineData: {
+                  mimeType: matches[1],
+                  data: matches[2]
+                }
+              });
+            }
+          } else {
+            // For regular URLs, try to fetch and convert to base64
+            try {
+              const imgResponse = await fetch(referenceImageUrl);
+              if (imgResponse.ok) {
+                const buffer = await imgResponse.arrayBuffer();
+                const base64 = Buffer.from(buffer).toString('base64');
+                const contentType = imgResponse.headers.get('content-type') || 'image/jpeg';
+                parts.unshift({
+                  inlineData: {
+                    mimeType: contentType,
+                    data: base64
+                  }
+                });
+              }
+            } catch (e) {
+              console.warn("[Veo] Could not fetch reference image:", e);
+            }
+          }
+          
+          (requestBody.contents as Array<{role: string; parts: Array<Record<string, unknown>>}>)[0].parts = parts;
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.text();
+          console.error("[Veo] Error:", error);
+          
+          // Check for specific error messages
+          if (error.includes("not found") || error.includes("does not exist")) {
+            return { 
+              success: false, 
+              error: "Veo model not available. Please ensure you have access to Google's Veo API." 
+            };
+          }
+          
+          return { success: false, error: `Veo API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        console.log("[Veo] Response:", JSON.stringify(data, null, 2));
+        
+        // Check for video in response
+        const videoPart = data.candidates?.[0]?.content?.parts?.find(
+          (p: { video?: { uri?: string }; fileData?: { fileUri?: string } }) => p.video || p.fileData
+        );
+        
+        if (videoPart?.video?.uri) {
+          return { success: true, mediaUrl: videoPart.video.uri };
+        }
+        
+        if (videoPart?.fileData?.fileUri) {
+          return { success: true, mediaUrl: videoPart.fileData.fileUri };
+        }
+
+        // Check for inline video data
+        const inlineVideo = data.candidates?.[0]?.content?.parts?.find(
+          (p: { inlineData?: { mimeType: string; data: string } }) => 
+            p.inlineData?.mimeType?.startsWith('video/')
+        );
+        
+        if (inlineVideo?.inlineData) {
+          return {
+            success: true,
+            mediaUrl: `data:${inlineVideo.inlineData.mimeType};base64,${inlineVideo.inlineData.data}`,
+          };
+        }
+
+        // If we get a name/operation for async job
+        if (data.name) {
+          return { success: true, jobId: data.name };
+        }
+
+        return { success: false, error: "No video returned from Veo. The model may not support direct video generation yet." };
+      }
+
+      case "kling": {
+        // Kling AI video generation via their API
+        const response = await fetch("https://api.klingai.com/v1/videos/text2video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            negative_prompt: "",
+            cfg_scale: 0.5,
+            mode: "std",
+            aspect_ratio: "16:9",
+            duration: "5",
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          console.error("[Kling] Error:", error);
+          return { success: false, error: `Kling API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        
+        if (data.data?.task_id) {
+          return { success: true, jobId: data.data.task_id };
+        }
+        
+        return { success: false, error: "No task ID returned from Kling" };
+      }
+
       default:
         // Handle unimplemented providers gracefully
         return { 
@@ -521,6 +667,67 @@ export async function checkJobStatus(provider: string, jobId: string, apiKey: st
           return { status: "completed", mediaUrl: data.assets?.video };
         } else if (data.state === "failed") {
           return { status: "failed", error: data.failure_reason || "Generation failed" };
+        } else {
+          return { status: "processing" };
+        }
+      }
+
+      case "veo": {
+        // Google Veo job status check via operations API
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/${jobId}?key=${apiKey}`,
+          {
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (!response.ok) {
+          return { status: "failed", error: "Failed to check Veo status" };
+        }
+
+        const data = await response.json();
+        
+        if (data.done) {
+          if (data.error) {
+            return { status: "failed", error: data.error.message || "Veo generation failed" };
+          }
+          
+          // Extract video URL from response
+          const videoPart = data.response?.candidates?.[0]?.content?.parts?.find(
+            (p: { video?: { uri?: string }; fileData?: { fileUri?: string } }) => p.video || p.fileData
+          );
+          
+          if (videoPart?.video?.uri) {
+            return { status: "completed", mediaUrl: videoPart.video.uri };
+          }
+          if (videoPart?.fileData?.fileUri) {
+            return { status: "completed", mediaUrl: videoPart.fileData.fileUri };
+          }
+          
+          return { status: "failed", error: "No video in Veo response" };
+        }
+        
+        return { status: "processing", progress: data.metadata?.progress };
+      }
+
+      case "kling": {
+        // Kling job status check
+        const response = await fetch(`https://api.klingai.com/v1/videos/text2video/${jobId}`, {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          return { status: "failed", error: "Failed to check Kling status" };
+        }
+
+        const data = await response.json();
+        
+        if (data.data?.task_status === "succeed") {
+          return { status: "completed", mediaUrl: data.data.task_result?.videos?.[0]?.url };
+        } else if (data.data?.task_status === "failed") {
+          return { status: "failed", error: data.data.task_status_msg || "Kling generation failed" };
         } else {
           return { status: "processing" };
         }

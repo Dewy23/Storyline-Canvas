@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -10,6 +10,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Tile, Timeline } from "@shared/schema";
 
+interface GenerationResult {
+  success: boolean;
+  mediaUrl?: string;
+  jobId?: string;
+  status?: string;
+  error?: string;
+  provider?: string;
+  message?: string;
+}
+
 export function TimelineWorkspace() {
   const { 
     timelines, tiles,
@@ -17,9 +27,56 @@ export function TimelineWorkspace() {
   } = useAppStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [pendingJobs, setPendingJobs] = useState<Map<string, { provider: string; tileId: string }>>(new Map());
   
   const tilesRef = useRef(tiles);
   tilesRef.current = tiles;
+
+  // Poll for job status
+  useEffect(() => {
+    if (pendingJobs.size === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      const jobs = Array.from(pendingJobs.entries());
+      for (const [tileId, job] of jobs) {
+        try {
+          const response = await fetch(`/api/generate/status/${tileId}`);
+          if (!response.ok) continue;
+
+          const status = await response.json();
+
+          if (status.status === "completed" && status.mediaUrl) {
+            updateTile(tileId, { isGenerating: false, mediaUrl: status.mediaUrl });
+            setPendingJobs((prev) => {
+              const next = new Map(prev);
+              next.delete(tileId);
+              return next;
+            });
+            toast({
+              title: "Generation complete",
+              description: `${status.type === "video" ? "Video" : "Image"} generated with ${job.provider}`,
+            });
+          } else if (status.status === "failed") {
+            updateTile(tileId, { isGenerating: false });
+            setPendingJobs((prev) => {
+              const next = new Map(prev);
+              next.delete(tileId);
+              return next;
+            });
+            toast({
+              title: "Generation failed",
+              description: status.error || "Check your API key and try again",
+              variant: "destructive",
+            });
+          }
+        } catch (e) {
+          console.error("Job polling error:", e);
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [pendingJobs, updateTile, toast]);
 
   const createTileMutation = useMutation({
     mutationFn: async (tile: Omit<Tile, "id">) => {
@@ -96,12 +153,48 @@ export function TimelineWorkspace() {
         referenceImageUrl: referenceFrame || tile.mediaUrl,
       });
       
-      const result = await response.json() as { mediaUrl: string };
-      return { tileId, result, tile };
+      const result = await response.json() as GenerationResult;
+      return { tileId, result, tile, provider };
     },
-    onSuccess: ({ tileId, result, tile }) => {
-      const newMediaUrl = result.mediaUrl || `https://picsum.photos/seed/${tileId}/400/300`;
+    onSuccess: ({ tileId, result, tile, provider }) => {
       const currentTiles = tilesRef.current;
+      
+      // Check if this is an async job that needs polling
+      if (result.jobId && result.status === "processing") {
+        setPendingJobs((prev) => {
+          const next = new Map(prev);
+          next.set(tileId, { provider, tileId });
+          return next;
+        });
+        toast({
+          title: "Generation started",
+          description: `${tile.type === "video" ? "Video" : "Image"} is being generated. This may take a few minutes.`,
+        });
+        return;
+      }
+      
+      // Check for errors
+      if (!result.success || result.error) {
+        updateTile(tileId, { isGenerating: false });
+        toast({
+          title: "Generation failed",
+          description: result.error || "Check your API key and credits",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const newMediaUrl = result.mediaUrl;
+      
+      if (!newMediaUrl) {
+        updateTile(tileId, { isGenerating: false });
+        toast({
+          title: "Generation failed",
+          description: "No media returned. Check your API key and credits.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       updateTile(tileId, { 
         isGenerating: false, 
@@ -129,24 +222,21 @@ export function TimelineWorkspace() {
 
       toast({
         title: "Generation complete",
-        description: "Your content has been generated",
+        description: result.message || `Generated with ${result.provider || provider}`,
       });
     },
-    onError: (error, tileId) => {
-      const placeholderUrl = `https://picsum.photos/seed/${tileId}/400/300`;
+    onError: (error: Error, tileId) => {
+      updateTile(tileId, { isGenerating: false });
       
-      updateTile(tileId, { 
-        isGenerating: false,
-        mediaUrl: placeholderUrl,
-      });
-      updateTileMutation.mutate({ 
-        id: tileId, 
-        updates: { isGenerating: false, mediaUrl: placeholderUrl } 
-      });
+      const errorMessage = error.message || "Generation failed";
+      const isApiError = errorMessage.includes("API") || errorMessage.includes("key") || errorMessage.includes("401");
       
       toast({
-        title: "Generation complete",
-        description: "Placeholder content added for demo",
+        title: "Generation failed",
+        description: isApiError 
+          ? "API call failed: check your key and credits" 
+          : errorMessage,
+        variant: "destructive",
       });
     },
   });
