@@ -287,7 +287,7 @@
   }
 }
 
-/* GoldenLayout Custom Styling */
+/* GoldenLayout Custom Styling - After Effects Style */
 .golden-layout-container {
   background: hsl(var(--background));
 }
@@ -296,36 +296,38 @@
   background: hsl(var(--background)) !important;
 }
 
+/* Panel headers - After Effects style dark gray */
 .lm_header {
-  background: linear-gradient(
-    to bottom,
-    hsl(var(--muted) / 0.6),
-    hsl(var(--muted) / 0.4)
-  ) !important;
+  background: hsl(220 10% 25%) !important;
   border-bottom: 1px solid hsl(var(--border)) !important;
   height: 28px !important;
   transition: background 0.15s ease !important;
   position: relative !important;
 }
 
+.dark .lm_header {
+  background: hsl(220 10% 22%) !important;
+}
+
 .lm_header:hover {
-  background: linear-gradient(
-    to bottom,
-    hsl(var(--muted) / 0.9),
-    hsl(var(--muted) / 0.7)
-  ) !important;
+  background: hsl(220 10% 32%) !important;
   cursor: grab;
+}
+
+.dark .lm_header:hover {
+  background: hsl(220 10% 28%) !important;
 }
 
 .lm_header:active {
   cursor: grabbing;
-  background: linear-gradient(
-    to bottom,
-    hsl(var(--primary) / 0.2),
-    hsl(var(--primary) / 0.1)
-  ) !important;
+  background: hsl(220 15% 35%) !important;
 }
 
+.dark .lm_header:active {
+  background: hsl(220 15% 30%) !important;
+}
+
+/* Drag indicator icon on headers */
 .lm_header::before {
   content: "⋮⋮";
   position: absolute;
@@ -333,26 +335,30 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 10px;
-  color: hsl(var(--muted-foreground));
+  color: hsl(0 0% 70%);
   opacity: 0;
   transition: opacity 0.15s ease;
   letter-spacing: -2px;
 }
 
 .lm_header:hover::before {
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
+/* Tabs - After Effects style */
 .lm_tab {
-  background: hsl(var(--card)) !important;
-  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(220 10% 20%) !important;
+  border: 1px solid hsl(220 10% 28%) !important;
   border-bottom: none !important;
   border-radius: 4px 4px 0 0 !important;
   margin-right: 2px !important;
-  padding: 4px 10px !important;
-  font-size: 12px !important;
+  padding: 4px 12px !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
-  color: hsl(var(--muted-foreground)) !important;
+  color: hsl(0 0% 65%) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  transition: all 0.15s ease !important;
 }
 
 .lm_tab.lm_active {
@@ -362,7 +368,8 @@
 }
 
 .lm_tab:hover:not(.lm_active) {
-  background: hsl(var(--accent)) !important;
+  background: hsl(220 10% 28%) !important;
+  color: hsl(0 0% 80%) !important;
 }
 
 .lm_content {
@@ -370,21 +377,112 @@
   border: none !important;
 }
 
+/* Splitters with visible resize handles */
 .lm_splitter {
-  background: hsl(var(--border)) !important;
+  background: hsl(220 10% 30%) !important;
   opacity: 1 !important;
+  position: relative !important;
+  z-index: 10 !important;
+  transition: background 0.15s ease !important;
+}
+
+.dark .lm_splitter {
+  background: hsl(220 10% 25%) !important;
 }
 
 .lm_splitter:hover {
-  background: hsl(var(--primary)) !important;
+  background: hsl(var(--primary) / 0.8) !important;
 }
 
 .lm_splitter.lm_vertical {
-  width: 4px !important;
+  width: 6px !important;
+  cursor: col-resize !important;
 }
 
 .lm_splitter.lm_horizontal {
-  height: 4px !important;
+  height: 6px !important;
+  cursor: row-resize !important;
+}
+
+/* Circular resize handle in center of splitter */
+.lm_splitter::after {
+  content: "";
+  position: absolute;
+  background: hsl(220 10% 45%);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  opacity: 0.7;
+}
+
+.dark .lm_splitter::after {
+  background: hsl(220 10% 50%);
+}
+
+.lm_splitter:hover::after {
+  background: hsl(var(--primary));
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Vertical splitter - horizontal resize handle */
+.lm_splitter.lm_vertical::after {
+  width: 8px;
+  height: 24px;
+  border-radius: 4px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.lm_splitter.lm_vertical:hover::after {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Horizontal splitter - vertical resize handle */
+.lm_splitter.lm_horizontal::after {
+  width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.lm_splitter.lm_horizontal:hover::after {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Additional edge indicators for splitters */
+.lm_splitter::before {
+  content: "";
+  position: absolute;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.lm_splitter.lm_vertical::before {
+  width: 2px;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: hsl(220 10% 35%);
+}
+
+.lm_splitter.lm_horizontal::before {
+  height: 2px;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: hsl(220 10% 35%);
+}
+
+.dark .lm_splitter.lm_vertical::before,
+.dark .lm_splitter.lm_horizontal::before {
+  background: hsl(220 10% 30%);
+}
+
+.lm_splitter:hover::before {
+  background: hsl(var(--primary) / 0.5);
 }
 
 .lm_dropTargetIndicator {
@@ -433,3 +531,4 @@
   width: 100%;
   overflow: hidden;
 }
+
