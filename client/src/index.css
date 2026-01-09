@@ -287,17 +287,104 @@
   }
 }
 
-/* Custom Workspace Grid Panel Styling */
-.workspace-panel-header {
-  background: linear-gradient(to bottom, hsl(220 10% 28%), hsl(220 10% 22%));
-  cursor: grab;
+/* GoldenLayout Custom Styling */
+.golden-layout-container {
+  background-color: hsl(var(--background));
 }
 
-.workspace-panel-header:hover {
-  background: linear-gradient(to bottom, hsl(220 10% 32%), hsl(220 10% 26%));
+.lm_goldenlayout {
+  background-color: hsl(var(--background)) !important;
 }
 
-.workspace-panel-header:active {
-  cursor: grabbing;
+.lm_header,
+.lm_header .lm_tab {
+  cursor: grab !important;
+}
+
+.lm_header:active,
+.lm_header .lm_tab:active {
+  cursor: grabbing !important;
+}
+
+.lm_header {
+  background: linear-gradient(to bottom, hsl(220 10% 28%), hsl(220 10% 22%)) !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+}
+
+.lm_header:hover {
+  background: linear-gradient(to bottom, hsl(220 10% 32%), hsl(220 10% 26%)) !important;
+}
+
+.lm_tabs {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+.lm_tab {
+  background: transparent !important;
+  border: none !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  padding: 4px 12px !important;
+  margin: 0 !important;
+}
+
+.lm_tab.lm_active {
+  color: hsl(var(--foreground)) !important;
+  background: hsl(var(--background) / 0.3) !important;
+}
+
+.lm_tab:hover {
+  color: hsl(var(--foreground)) !important;
+}
+
+.lm_controls {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.lm_controls > * {
+  opacity: 0.6 !important;
+}
+
+.lm_controls > *:hover {
+  opacity: 1 !important;
+}
+
+.lm_splitter {
+  background-color: hsl(var(--border)) !important;
+  opacity: 1 !important;
+}
+
+.lm_splitter:hover {
+  background-color: hsl(var(--primary)) !important;
+}
+
+.lm_splitter.lm_vertical {
+  width: 6px !important;
+}
+
+.lm_splitter.lm_horizontal {
+  height: 6px !important;
+}
+
+.lm_content {
+  background-color: hsl(var(--background)) !important;
+  border: none !important;
+}
+
+.lm_dragProxy {
+  background-color: hsl(var(--primary) / 0.3) !important;
+  border: 2px dashed hsl(var(--primary)) !important;
+}
+
+.lm_dropTargetIndicator {
+  background-color: hsl(var(--primary) / 0.2) !important;
+  border: 2px solid hsl(var(--primary)) !important;
 }
 

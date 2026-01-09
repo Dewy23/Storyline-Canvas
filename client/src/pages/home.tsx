@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Toolbar } from "@/components/toolbar";
-import { WorkspaceGrid } from "@/components/workspace-grid";
+import { GoldenWorkspace } from "@/components/golden-workspace";
 import { SettingsModal } from "@/components/settings-modal";
 import { ExportModal } from "@/components/export-modal";
 import { useAppStore } from "@/lib/store";
@@ -180,7 +180,7 @@ export default function Home() {
     <div className="h-screen flex flex-col bg-background">
       <Toolbar />
       <main className="flex-1 overflow-hidden">
-        <WorkspaceGrid />
+        <GoldenWorkspace />
       </main>
       <SettingsModal />
       <ExportModal />
