@@ -2,7 +2,10 @@ import { z } from "zod";
 
 // AI Provider types
 export const aiProviders = [
-  // Image providers
+  // Image providers (free-tier first)
+  "huggingface",
+  "replicate",
+  "pollinations",
   "openai",
   "gemini",
   "stability",
@@ -11,7 +14,6 @@ export const aiProviders = [
   "hunyuan",
   "firefly",
   "bria",
-  "pollinations",
   "runware",
   // Video providers
   "runway",
@@ -24,8 +26,7 @@ export const aiProviders = [
   "akool",
   "mirage",
   "pictory",
-  // Multi/Audio providers
-  "replicate",
+  // Audio providers
   "elevenlabs",
   // Legacy
   "dalle3",

@@ -15,7 +15,7 @@ interface JobStatus {
 }
 
 // Provider categorization
-export const IMAGE_PROVIDERS = ["openai", "gemini", "stability", "flux", "ideogram", "hunyuan", "firefly", "bria", "pollinations", "runware", "replicate", "dalle3"];
+export const IMAGE_PROVIDERS = ["huggingface", "replicate", "pollinations", "openai", "gemini", "stability", "flux", "ideogram", "hunyuan", "firefly", "bria", "runware", "dalle3"];
 export const VIDEO_PROVIDERS = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
 
 export async function validateApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; error?: string }> {
@@ -42,6 +42,14 @@ export async function validateApiKey(provider: string, apiKey: string): Promise<
         const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
         if (response.ok) return { valid: true };
         return { valid: false, error: "Invalid API key" };
+      }
+      
+      case "huggingface": {
+        const response = await fetch("https://huggingface.co/api/whoami-v2", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (response.ok) return { valid: true };
+        return { valid: false, error: "Invalid Hugging Face token" };
       }
       
       case "replicate":
@@ -303,17 +311,59 @@ export async function generateImage(
       }
 
       case "pollinations": {
-        // Pollinations has a simple URL-based API
+        // Pollinations has a simple URL-based API - no key required
         const encodedPrompt = encodeURIComponent(prompt);
         const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
         return { success: true, mediaUrl: imageUrl };
+      }
+
+      case "huggingface": {
+        // Use FLUX.1-schnell model from Black Forest Labs (fast and high quality)
+        const modelId = "black-forest-labs/FLUX.1-schnell";
+        const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "X-Wait-For-Model": "true", // Wait for model to load if cold
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: {
+              width: 1024,
+              height: 1024,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[HuggingFace] Error:", response.status, errorText);
+          
+          // Handle model loading (503 error)
+          if (response.status === 503) {
+            return { success: false, error: "Model is loading, please try again in a moment" };
+          }
+          if (response.status === 401) {
+            return { success: false, error: "Invalid Hugging Face token" };
+          }
+          return { success: false, error: `Hugging Face API error: ${response.status}` };
+        }
+
+        // Response is binary image data
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        return {
+          success: true,
+          mediaUrl: `data:image/png;base64,${base64}`,
+        };
       }
 
       default:
         // Handle unimplemented providers gracefully
         return { 
           success: false, 
-          error: `${provider} integration is not yet available. Please use one of these providers: OpenAI, Stability AI, Flux, Ideogram, Gemini, or Pollinations.` 
+          error: `${provider} integration is not yet available. Try: Hugging Face, Replicate, Pollinations (free), OpenAI, Gemini, or Stability AI.` 
         };
     }
   } catch (error) {

@@ -27,15 +27,19 @@ interface ProviderConfig {
 }
 
 const imageProviders: ProviderConfig[] = [
+  // Free-tier friendly providers first
+  { id: "huggingface", name: "Hugging Face (Free Tier)", description: "Free access to FLUX.1 and thousands of models", docUrl: "https://huggingface.co/settings/tokens" },
+  { id: "replicate", name: "Replicate (Free Credits)", description: "Run open-source models with free starter credits", docUrl: "https://replicate.com/account/api-tokens" },
+  { id: "pollinations", name: "Pollinations.ai (Free)", description: "100% free open-source AI - no key required", docUrl: "https://pollinations.ai" },
+  // Premium providers
   { id: "openai", name: "OpenAI (DALL-E / GPT Image)", description: "DALL-E 3 and GPT-4 Vision image generation", docUrl: "https://platform.openai.com/api-keys" },
   { id: "gemini", name: "Google Gemini", description: "Google's Gemini multimodal AI for image generation", docUrl: "https://aistudio.google.com/apikey" },
   { id: "stability", name: "Stability AI", description: "Stable Diffusion XL and other models", docUrl: "https://platform.stability.ai/account/keys" },
-  { id: "flux", name: "Flux (Black Forest Labs)", description: "Fast, high-quality image generation via Replicate", docUrl: "https://replicate.com/account/api-tokens" },
+  { id: "flux", name: "Flux (via Replicate)", description: "Black Forest Labs FLUX.1 via Replicate token", docUrl: "https://replicate.com/account/api-tokens" },
   { id: "ideogram", name: "Ideogram", description: "AI image generation with excellent text rendering", docUrl: "https://ideogram.ai/manage-api" },
   { id: "hunyuan", name: "Hunyuan (Tencent)", description: "Tencent's AI image generation model", docUrl: "https://cloud.tencent.com/product/hunyuan" },
   { id: "firefly", name: "Adobe Firefly", description: "Adobe's creative AI for image generation", docUrl: "https://developer.adobe.com/firefly-api/api/" },
   { id: "bria", name: "Bria.ai", description: "Enterprise AI for visual content generation", docUrl: "https://bria.ai/api" },
-  { id: "pollinations", name: "Pollinations.ai", description: "Open-source AI image generation", docUrl: "https://pollinations.ai" },
   { id: "runware", name: "Runware", description: "Fast AI image generation API", docUrl: "https://runware.ai" },
 ];
 
