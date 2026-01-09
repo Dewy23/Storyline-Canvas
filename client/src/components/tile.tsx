@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Image, Video, Wand2, Loader2, Maximize2, X, Film, ImageIcon } from "lucide-react";
+import { Image, Video, Wand2, Loader2, Maximize2, X, Film, ImageIcon, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,16 +64,17 @@ export function Tile({
   const [activeTab, setActiveTab] = useState<"view" | "prompt" | "source">("view");
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { updateTile, selectedTileId, setSelectedTileId, apiSettings } = useAppStore();
+  const { updateTile, selectedTileId, setSelectedTileId, apiSettings, setSettingsOpen } = useAppStore();
   const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
   const allProviders = tile.type === "image" ? imageProviders : videoProviders;
   
+  // Only show connected providers in dropdown
   const connectedProviders = allProviders.filter((p) => 
     apiSettings.some((s) => s.provider === p && s.isConnected)
   );
   
-  const providers = connectedProviders.length > 0 ? connectedProviders : allProviders;
+  const hasConnectedProviders = connectedProviders.length > 0;
 
   const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
   const hasAboveImage = tile.type === "video" && aboveImageTile?.mediaUrl;
@@ -262,52 +263,78 @@ export function Tile({
             </TabsContent>
 
             <TabsContent value="prompt" className="flex-1 m-0 p-2 flex flex-col gap-2">
-              <Select
-                value={tile.provider || providers[0]}
-                onValueChange={handleProviderChange}
-              >
-                <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.map((provider) => {
-                    const isConnected = apiSettings.some((s) => s.provider === provider && s.isConnected);
-                    return (
-                      <SelectItem key={provider} value={provider} className="text-xs">
-                        <span className="flex items-center gap-2">
-                          {providerLabels[provider]}
-                          {isConnected && <span className="w-2 h-2 rounded-full bg-green-500" />}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <Textarea
-                placeholder={`Describe the ${tile.type} you want to generate...`}
-                value={tile.prompt}
-                onChange={(e) => handlePromptChange(e.target.value)}
-                onBlur={handlePromptBlur}
-                className="flex-1 min-h-[80px] text-xs resize-none"
-                data-testid={`textarea-prompt-${tile.id}`}
-              />
-              <Button
-                size="sm"
-                className="w-full gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onGenerate();
-                }}
-                disabled={tile.isGenerating || !tile.prompt}
-                data-testid={`button-generate-${tile.id}`}
-              >
-                {tile.isGenerating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Wand2 className="w-4 h-4" />
-                )}
-                Generate
-              </Button>
+              {hasConnectedProviders ? (
+                <>
+                  <Select
+                    value={tile.provider && connectedProviders.includes(tile.provider) ? tile.provider : connectedProviders[0]}
+                    onValueChange={handleProviderChange}
+                  >
+                    <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {connectedProviders.map((provider) => (
+                        <SelectItem key={provider} value={provider} className="text-xs">
+                          <span className="flex items-center gap-2">
+                            {providerLabels[provider]}
+                            <span className="w-2 h-2 rounded-full bg-green-500" />
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder={`Describe the ${tile.type} you want to generate...`}
+                    value={tile.prompt}
+                    onChange={(e) => handlePromptChange(e.target.value)}
+                    onBlur={handlePromptBlur}
+                    className="flex-1 min-h-[80px] text-xs resize-none"
+                    data-testid={`textarea-prompt-${tile.id}`}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGenerate();
+                    }}
+                    disabled={tile.isGenerating || !tile.prompt}
+                    data-testid={`button-generate-${tile.id}`}
+                  >
+                    {tile.isGenerating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-4 h-4" />
+                    )}
+                    Generate
+                  </Button>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-2">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">No {tile.type} providers connected</p>
+                    <p className="text-xs text-muted-foreground">
+                      Add an API key in Settings to start generating
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSettingsOpen(true);
+                    }}
+                    data-testid={`button-open-settings-${tile.id}`}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Open Settings
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="source" className="flex-1 m-0 p-2 flex flex-col gap-2">
