@@ -531,3 +531,28 @@
   overflow: hidden;
 }
 
+/* Force resize cursor on ALL separators and widen hover area */
+[data-panel-group-separator],
+div[role="separator"],
+.resize-handle,
+.panel-separator,
+[data-panel-group-direction="horizontal"] > div,
+[data-panel-group-direction="vertical"] > div {
+  cursor: row-resize !important;
+  min-width: 12px !important;
+  min-height: 12px !important;
+}
+
+[data-panel-group-direction="vertical"] [data-panel-group-separator],
+[data-panel-group-direction="vertical"] div[role="separator"] {
+  cursor: col-resize !important;
+}
+
+/* Hover feedback for react-resizable-panels */
+[data-panel-group-separator]:hover,
+div[role="separator"]:hover,
+.resize-handle:hover {
+  background: rgba(100, 100, 255, 0.2) !important;
+  transition: background 0.2s;
+}
+
