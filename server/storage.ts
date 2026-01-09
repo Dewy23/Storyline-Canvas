@@ -325,7 +325,7 @@ export class MemStorage implements IStorage {
     if (existing) {
       const updated: APISetting = { 
         ...existing, 
-        ...insertSetting, 
+        apiKey: insertSetting.apiKey,
         isConnected: insertSetting.apiKey ? true : false 
       };
       this.apiSettings.set(existing.id, updated);
@@ -334,7 +334,8 @@ export class MemStorage implements IStorage {
 
     const id = randomUUID();
     const setting: APISetting = { 
-      ...insertSetting, 
+      provider: insertSetting.provider,
+      apiKey: insertSetting.apiKey,
       id, 
       isConnected: insertSetting.apiKey ? true : false 
     };

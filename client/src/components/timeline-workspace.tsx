@@ -93,7 +93,7 @@ export function TimelineWorkspace() {
         prompt: tile.prompt,
         provider: provider,
         tileId,
-        initialFrame: referenceFrame || tile.mediaUrl,
+        referenceImageUrl: referenceFrame || tile.mediaUrl,
       });
       
       const result = await response.json() as { mediaUrl: string };

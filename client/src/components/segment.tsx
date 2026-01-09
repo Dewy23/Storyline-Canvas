@@ -94,6 +94,7 @@ export function Segment({
           tile={videoTile}
           onGenerate={() => onGenerate(videoTile.id)}
           onFrameSliderChange={onFrameSliderChange}
+          aboveImageTile={imageTile}
           isLinked={false}
         />
       )}

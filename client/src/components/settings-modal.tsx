@@ -43,8 +43,10 @@ export function SettingsModal() {
   const queryClient = useQueryClient();
 
   const saveSettingMutation = useMutation({
-    mutationFn: (data: { provider: AIProvider; apiKey: string }) => 
-      apiRequest<APISetting>("POST", "/api/settings", data),
+    mutationFn: async (data: { provider: AIProvider; apiKey: string }) => {
+      const response = await apiRequest("POST", "/api/settings", data);
+      return response.json() as Promise<APISetting>;
+    },
     onSuccess: (savedSetting) => {
       updateApiSetting(savedSetting.provider, {
         apiKey: savedSetting.apiKey,

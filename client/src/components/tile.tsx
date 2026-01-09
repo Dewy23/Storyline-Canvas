@@ -34,8 +34,8 @@ const providerLabels: Record<AIProvider, string> = {
   replicate: "Replicate",
 };
 
-const imageProviders: AIProvider[] = ["flux", "stability", "dalle3", "ideogram"];
-const videoProviders: AIProvider[] = ["runway", "kling", "pika", "luma"];
+const imageProviders: AIProvider[] = ["stability", "flux", "openai", "dalle3", "ideogram", "replicate"];
+const videoProviders: AIProvider[] = ["runway", "kling", "pika", "luma", "replicate"];
 
 export function Tile({
   tile,
@@ -48,10 +48,16 @@ export function Tile({
   const [activeTab, setActiveTab] = useState<"view" | "prompt" | "source">("view");
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { updateTile, selectedTileId, setSelectedTileId } = useAppStore();
+  const { updateTile, selectedTileId, setSelectedTileId, apiSettings } = useAppStore();
   const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
-  const providers = tile.type === "image" ? imageProviders : videoProviders;
+  const allProviders = tile.type === "image" ? imageProviders : videoProviders;
+  
+  const connectedProviders = allProviders.filter((p) => 
+    apiSettings.some((s) => s.provider === p && s.isConnected)
+  );
+  
+  const providers = connectedProviders.length > 0 ? connectedProviders : allProviders;
 
   const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
   const hasAboveImage = tile.type === "video" && aboveImageTile?.mediaUrl;
@@ -248,11 +254,17 @@ export function Tile({
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {providers.map((provider) => (
-                    <SelectItem key={provider} value={provider} className="text-xs">
-                      {providerLabels[provider]}
-                    </SelectItem>
-                  ))}
+                  {providers.map((provider) => {
+                    const isConnected = apiSettings.some((s) => s.provider === provider && s.isConnected);
+                    return (
+                      <SelectItem key={provider} value={provider} className="text-xs">
+                        <span className="flex items-center gap-2">
+                          {providerLabels[provider]}
+                          {isConnected && <span className="w-2 h-2 rounded-full bg-green-500" />}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Textarea

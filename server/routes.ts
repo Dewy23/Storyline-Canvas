@@ -11,6 +11,15 @@ import {
   insertApiSettingSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import {
+  validateApiKey,
+  generateImage,
+  generateVideo,
+  checkJobStatus,
+  storeJob,
+  getJob,
+  removeJob,
+} from "./providers";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -280,18 +289,45 @@ export async function registerRoutes(
     res.json(sanitized);
   });
 
+  app.get("/api/settings/connected-providers", async (req, res) => {
+    const settings = await storage.getApiSettings();
+    const connected = settings.filter((s) => s.isConnected).map((s) => s.provider);
+    
+    const imageProviders = ["stability", "flux", "openai", "dalle3", "ideogram", "replicate"];
+    const videoProviders = ["runway", "kling", "pika", "luma", "replicate"];
+    
+    res.json({
+      image: connected.filter((p) => imageProviders.includes(p)),
+      video: connected.filter((p) => videoProviders.includes(p)),
+    });
+  });
+
   app.post("/api/settings", async (req, res) => {
     try {
       const data = insertApiSettingSchema.parse(req.body);
+      
+      const validation = await validateApiKey(data.provider, data.apiKey);
+      
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: validation.error || "Invalid API key",
+          validated: false,
+        });
+      }
+      
       const setting = await storage.saveApiSetting(data);
+      
       res.status(201).json({
         ...setting,
-        apiKey: setting.apiKey ? "••••••••" : "",
+        apiKey: "••••••••",
+        isConnected: true,
+        validated: true,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
+      console.error("[Settings] Error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -304,31 +340,74 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Generation endpoints (placeholder)
+  // Generation endpoints
   const generateSchema = z.object({
     prompt: z.string(),
     provider: z.string().optional(),
     tileId: z.string(),
+    referenceImageUrl: z.string().optional(),
   });
 
   app.post("/api/generate/image", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
-      const provider = data.provider || "flux";
+      let provider = data.provider || "stability";
+      
+      const settings = await storage.getApiSettings();
+      const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
+      
+      if (!providerSetting) {
+        const fallbackProvider = settings.find((s) => 
+          ["stability", "flux", "openai", "dalle3", "replicate"].includes(s.provider) && s.isConnected
+        );
+        
+        if (!fallbackProvider) {
+          console.log(`[Generate Image] No connected provider, using placeholder`);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          return res.json({
+            success: true,
+            mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
+            provider: "placeholder",
+            message: "No AI provider connected - showing placeholder image",
+          });
+        }
+        provider = fallbackProvider.provider;
+      }
       
       console.log(`[Generate Image] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
       
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const apiKey = providerSetting?.apiKey || settings.find((s) => s.provider === provider)?.apiKey || "";
       
-      const imageUrl = `https://picsum.photos/seed/${data.tileId}/800/450`;
+      const result = await generateImage(provider, data.prompt, apiKey, data.referenceImageUrl);
+      
+      if (!result.success) {
+        console.error(`[Generate Image] Error: ${result.error}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: result.error,
+          provider,
+        });
+      }
+      
+      if (result.jobId) {
+        storeJob(data.tileId, provider, result.jobId, "image");
+        return res.json({
+          success: true,
+          jobId: result.jobId,
+          provider,
+          status: "processing",
+          message: "Generation started",
+        });
+      }
       
       res.json({
         success: true,
-        mediaUrl: imageUrl,
-        provider: provider,
-        message: `Image generated with ${provider} (placeholder)`,
+        mediaUrl: result.mediaUrl,
+        provider,
+        message: `Image generated with ${provider}`,
       });
     } catch (error) {
+      console.error("[Generate Image] Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
@@ -339,26 +418,93 @@ export async function registerRoutes(
   app.post("/api/generate/video", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
-      const provider = data.provider || "runway";
+      let provider = data.provider || "runway";
+      
+      const settings = await storage.getApiSettings();
+      const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
+      
+      if (!providerSetting) {
+        const fallbackProvider = settings.find((s) => 
+          ["runway", "kling", "pika", "luma", "replicate"].includes(s.provider) && s.isConnected
+        );
+        
+        if (!fallbackProvider) {
+          console.log(`[Generate Video] No connected provider, using placeholder`);
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          return res.json({
+            success: true,
+            mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
+            provider: "placeholder",
+            message: "No AI provider connected - showing placeholder",
+          });
+        }
+        provider = fallbackProvider.provider;
+      }
       
       console.log(`[Generate Video] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
       
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const apiKey = providerSetting?.apiKey || settings.find((s) => s.provider === provider)?.apiKey || "";
       
-      const videoUrl = `https://picsum.photos/seed/${data.tileId}/800/450`;
+      const result = await generateVideo(provider, data.prompt, apiKey, data.referenceImageUrl);
+      
+      if (!result.success) {
+        console.error(`[Generate Video] Error: ${result.error}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: result.error,
+          provider,
+        });
+      }
+      
+      if (result.jobId) {
+        storeJob(data.tileId, provider, result.jobId, "video");
+        return res.json({
+          success: true,
+          jobId: result.jobId,
+          provider,
+          status: "processing",
+          message: "Video generation started",
+        });
+      }
       
       res.json({
         success: true,
-        mediaUrl: videoUrl,
-        provider: provider,
-        message: `Video generated with ${provider} (placeholder - showing image)`,
+        mediaUrl: result.mediaUrl,
+        provider,
+        message: `Video generated with ${provider}`,
       });
     } catch (error) {
+      console.error("[Generate Video] Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
       res.status(500).json({ error: "Generation failed" });
     }
+  });
+
+  app.get("/api/generate/status/:tileId", async (req, res) => {
+    const job = getJob(req.params.tileId);
+    
+    if (!job) {
+      return res.status(404).json({ error: "No active job for this tile" });
+    }
+    
+    const settings = await storage.getApiSettings();
+    const providerSetting = settings.find((s) => s.provider === job.provider);
+    
+    const apiKey = providerSetting?.apiKey || "";
+    
+    const status = await checkJobStatus(job.provider, job.jobId, apiKey);
+    
+    if (status.status === "completed" || status.status === "failed") {
+      removeJob(req.params.tileId);
+    }
+    
+    res.json({
+      ...status,
+      provider: job.provider,
+      type: job.type,
+    });
   });
 
   app.post("/api/generate/audio", async (req, res) => {
