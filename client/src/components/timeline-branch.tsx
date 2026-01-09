@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Segment } from "./segment";
 import { useAppStore } from "@/lib/store";
@@ -10,6 +10,7 @@ interface TimelineBranchProps {
   onGenerate: (tileId: string) => void;
   onDeleteTimeline: (timelineId: string) => void;
   onFrameSliderChange?: (tileId: string, framePercent: number, previousVideoUrl: string) => void;
+  onAddSegment: (timelineId: string, position: number) => void;
   isFirst?: boolean;
 }
 
@@ -19,6 +20,7 @@ export function TimelineBranch({
   onGenerate,
   onDeleteTimeline,
   onFrameSliderChange,
+  onAddSegment,
   isFirst = false,
 }: TimelineBranchProps) {
   const { updateTimeline, linkedSegments, timelines } = useAppStore();
@@ -97,6 +99,16 @@ export function TimelineBranch({
                 />
               );
             })}
+            
+            <Button
+              variant="outline"
+              className="flex-shrink-0 h-[168px] w-[140px] border-dashed border-2 hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center gap-2"
+              onClick={() => onAddSegment(timeline.id, Math.max(...positions, -1) + 1)}
+              data-testid={`button-add-segment-${timeline.id}`}
+            >
+              <Plus className="w-6 h-6" />
+              <span className="text-xs text-muted-foreground">Add Segment</span>
+            </Button>
           </div>
         )}
       </div>

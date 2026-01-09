@@ -189,6 +189,34 @@ export function TimelineWorkspace() {
     [tiles, removeTile, removeTimeline, deleteTileMutation, deleteTimelineMutation, toast]
   );
 
+  const handleAddSegment = useCallback(
+    async (timelineId: string, position: number) => {
+      const imageResult = await createTileMutation.mutateAsync({
+        type: "image",
+        timelineId,
+        position,
+        prompt: "",
+        selectedFrame: 0,
+        isGenerating: false,
+      });
+      
+      await createTileMutation.mutateAsync({
+        type: "video",
+        timelineId,
+        position,
+        prompt: "",
+        selectedFrame: 0,
+        isGenerating: false,
+      });
+
+      toast({
+        title: "Segment added",
+        description: "New image and video tiles created",
+      });
+    },
+    [createTileMutation, toast]
+  );
+
   const sortedTimelines = [...timelines].sort((a, b) => a.order - b.order);
 
   return (
@@ -223,6 +251,7 @@ export function TimelineWorkspace() {
                       onGenerate={handleGenerate}
                       onDeleteTimeline={handleDeleteTimeline}
                       onFrameSliderChange={handleFrameSliderChange}
+                      onAddSegment={handleAddSegment}
                       isFirst={index === 0}
                     />
                   ))
