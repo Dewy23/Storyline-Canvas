@@ -134,17 +134,34 @@ export function WorkspaceGrid() {
   const showPreview = panelVisibility.RenderPreview !== false;
   const showToolbar = panelVisibility.TimelineToolbar !== false;
   const showTimelines = panelVisibility.Timelines !== false;
-  // Only show audio panel when Audio tab is active
-  const showAudio = panelVisibility.AudioWorkspace !== false && activeTab === "audio";
 
-  const gridTemplateRows = [
+  // Audio tab shows full DAW view, Timeline tab shows timeline view
+  const isAudioTab = activeTab === "audio";
+
+  // Timeline view grid layout
+  const timelineGridRows = [
     showPreview ? `${layout.previewHeight}%` : "0fr",
     showPreview ? `${HANDLE_SIZE}px` : "0fr",
     "1fr",
-    showAudio ? `${HANDLE_SIZE}px` : "0fr",
-    showAudio ? `${layout.audioHeight}%` : "0fr",
   ].join(" ");
 
+  // Audio tab - render full DAW workspace
+  if (isAudioTab) {
+    return (
+      <div
+        ref={containerRef}
+        className="h-full w-full bg-background overflow-hidden flex flex-col"
+        data-testid="workspace-grid-audio"
+      >
+        <PanelHeader title="Audio Workspace (DAW)" />
+        <div className="flex-1 overflow-hidden">
+          <AudioWorkspace />
+        </div>
+      </div>
+    );
+  }
+
+  // Timeline tab - render timeline workspace
   return (
     <div
       ref={containerRef}
@@ -152,7 +169,7 @@ export function WorkspaceGrid() {
       data-testid="workspace-grid"
       style={{
         display: "grid",
-        gridTemplateRows,
+        gridTemplateRows: timelineGridRows,
         gridTemplateColumns: "1fr",
       }}
     >
@@ -223,28 +240,6 @@ export function WorkspaceGrid() {
           </div>
         )}
       </div>
-
-      {showAudio && (
-        <>
-          <ResizeHandle
-            direction="horizontal"
-            onMouseDown={(e) => handleMouseDown(e, "audio")}
-            isActive={resizeTarget === "audio"}
-            testId="resize-handle-audio"
-          />
-
-          <div 
-            className="overflow-hidden bg-background border-t border-border"
-            style={{ minHeight: MIN_PANEL_PX }}
-            data-testid="panel-audio"
-          >
-            <PanelHeader title="Audio" />
-            <div className="h-[calc(100%-28px)] overflow-hidden">
-              <AudioWorkspace />
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
