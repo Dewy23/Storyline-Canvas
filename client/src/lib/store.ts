@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import type { Timeline, Tile, TileLink, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
 
-export type WorkspacePreset = "default" | "wide-preview" | "tall-timelines" | "compact" | "custom";
+export type WorkspacePreset = "default" | "wide-preview" | "tall-timelines" | "compact" | "custom" | "audio";
+
+export type GoldenLayoutConfig = Record<string, unknown>;
 
 export interface LayoutItem {
   i: string;
@@ -47,6 +49,11 @@ export const WORKSPACE_PRESETS: Record<WorkspacePreset, WorkspaceLayout> = {
     preview: { i: "preview", x: 1, y: 0, w: 11, h: 4, minW: 6, minH: 2 },
     toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
     timelines: { i: "timelines", x: 1, y: 4, w: 11, h: 8, minW: 6, minH: 3 },
+  },
+  audio: {
+    preview: { i: "preview", x: 1, y: 0, w: 11, h: 0, minW: 6, minH: 0 },
+    toolbar: { i: "toolbar", x: 0, y: 0, w: 1, h: 12, minW: 1, minH: 4, static: true },
+    timelines: { i: "timelines", x: 1, y: 0, w: 11, h: 12, minW: 6, minH: 3 },
   },
 };
 
@@ -123,6 +130,9 @@ interface AppState {
   setCustomLayout: (layout: WorkspaceLayout) => void;
   isPreviewCollapsed: boolean;
   setPreviewCollapsed: (collapsed: boolean) => void;
+  
+  goldenLayoutConfig: GoldenLayoutConfig | null;
+  setGoldenLayoutConfig: (config: GoldenLayoutConfig | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -226,4 +236,7 @@ export const useAppStore = create<AppState>((set) => ({
   setCustomLayout: (layout) => set({ customLayout: layout, workspacePreset: "custom" }),
   isPreviewCollapsed: false,
   setPreviewCollapsed: (collapsed) => set({ isPreviewCollapsed: collapsed }),
+  
+  goldenLayoutConfig: null,
+  setGoldenLayoutConfig: (config) => set({ goldenLayoutConfig: config }),
 }));

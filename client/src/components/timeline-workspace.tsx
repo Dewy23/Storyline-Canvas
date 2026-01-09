@@ -330,7 +330,11 @@ export function TimelineWorkspace() {
   const sortedTimelines = [...timelines].sort((a, b) => a.order - b.order);
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
+    <ResizablePanelGroup 
+      key={`workspace-${workspacePreset}-${isPreviewCollapsed}`}
+      direction="horizontal" 
+      className="flex-1"
+    >
       <ResizablePanel 
         defaultSize={sizes.toolbar} 
         minSize={4} 
