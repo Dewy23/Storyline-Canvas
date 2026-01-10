@@ -289,7 +289,13 @@ export function Tile({
                 <>
                   <Select
                     value={tile.provider && availableProviders.includes(tile.provider) ? tile.provider : availableProviders[0]}
-                    onValueChange={handleProviderChange}
+                    onValueChange={(value) => {
+                      if (value === "__manage_providers__") {
+                        setSettingsOpen(true);
+                      } else {
+                        handleProviderChange(value);
+                      }
+                    }}
                   >
                     <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
                       <SelectValue placeholder="Select provider" />
@@ -312,6 +318,13 @@ export function Tile({
                           </SelectItem>
                         );
                       })}
+                      <div className="border-t border-border my-1" />
+                      <SelectItem value="__manage_providers__" className="text-xs">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Settings className="w-3 h-3" />
+                          Manage Providers...
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <Textarea

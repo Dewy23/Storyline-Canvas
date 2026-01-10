@@ -1,6 +1,6 @@
-import { useMemo, useState, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, type MouseEvent as ReactMouseEvent } from "react";
 import { useAppStore } from "@/lib/store";
-import { Film, Layers, Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
+import { Film, Layers, Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, X, ZoomIn, ZoomOut, Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import type { Tile, LinkedSegment } from "@shared/schema";
@@ -27,10 +27,64 @@ export function RenderPreview() {
   const [duration, setDuration] = useState(0);
   const [playerHeight, setPlayerHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const resizeRef = useRef<{ startY: number; startHeight: number }>({ startY: 0, startHeight: 300 });
   
   const isSingleTimeline = timelines.length === 1;
+
+  const handleOpenLightbox = useCallback((imageUrl: string) => {
+    setLightboxImage(imageUrl);
+    setZoomLevel(1);
+  }, []);
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxImage(null);
+    setZoomLevel(1);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev + 0.25, 3));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev - 0.25, 0.5));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomLevel(1);
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    if (lightboxImage) {
+      const link = document.createElement("a");
+      link.href = lightboxImage;
+      link.download = `storyforge-preview-${Date.now()}.png`;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }, [lightboxImage]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && lightboxImage) {
+        handleCloseLightbox();
+      }
+    };
+    
+    if (lightboxImage) {
+      document.addEventListener("keydown", handleEsc);
+      document.body.style.overflow = "hidden";
+    }
+    
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [lightboxImage, handleCloseLightbox]);
 
   const segmentPreviews = useMemo((): SegmentPreview[] => {
     let segments: { timelineId: string; position: number; order: number; id: string }[] = [];
@@ -286,6 +340,21 @@ export function RenderPreview() {
             <Film className="w-4 h-4" />
             {isPlayerOpen ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
           </Button>
+          {segmentPreviews.some(p => p.imageTile?.mediaUrl) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 gap-1"
+              onClick={() => {
+                const firstImageUrl = segmentPreviews.find(p => p.imageTile?.mediaUrl)?.imageTile?.mediaUrl;
+                if (firstImageUrl) handleOpenLightbox(firstImageUrl);
+              }}
+              data-testid="button-view-full-image"
+            >
+              <Maximize2 className="w-3 h-3" />
+              <span className="text-xs">View Full Image</span>
+            </Button>
+          )}
         </div>
         <span className="text-xs text-muted-foreground">
           {segmentPreviews.length} segment{segmentPreviews.length !== 1 ? "s" : ""} {isSingleTimeline && "(auto)"}
@@ -293,13 +362,21 @@ export function RenderPreview() {
       </div>
       
       <div className="flex-1 flex items-center p-4 overflow-x-auto gap-2">
-        {segmentPreviews.map((preview, index) => (
+        {segmentPreviews.map((preview, index) => {
+          const imageUrl = preview.imageTile?.mediaUrl;
+          const canOpenLightbox = !!imageUrl;
+          
+          return (
           <div 
             key={preview.segmentId} 
-            className="relative flex-shrink-0"
+            className="relative flex-shrink-0 group/segment"
             data-testid={`preview-segment-${index}`}
           >
-            <div className="w-24 h-14 rounded-md overflow-hidden border border-border bg-muted">
+            <div 
+              className={`w-24 h-14 rounded-md overflow-hidden border border-border bg-muted ${canOpenLightbox ? "cursor-pointer hover:ring-2 hover:ring-primary transition-all" : ""}`}
+              onClick={() => canOpenLightbox && handleOpenLightbox(imageUrl)}
+              title={canOpenLightbox ? "Click to view full image" : preview.hasVideo ? "Video only - no image to preview" : "No content"}
+            >
               {preview.thumbnailUrl ? (
                 <img 
                   src={preview.thumbnailUrl} 
@@ -309,6 +386,12 @@ export function RenderPreview() {
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Layers className="w-5 h-5 text-muted-foreground" />
+                </div>
+              )}
+              
+              {canOpenLightbox && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/segment:opacity-100 transition-opacity flex items-center justify-center">
+                  <Maximize2 className="w-4 h-4 text-white" />
                 </div>
               )}
             </div>
@@ -326,13 +409,94 @@ export function RenderPreview() {
               )}
             </div>
           </div>
-        ))}
+        );
+        })}
         
         <div className="flex-shrink-0 ml-4 flex flex-col items-center justify-center text-muted-foreground">
           <Film className="w-6 h-6 mb-1" />
           <span className="text-xs">Export</span>
         </div>
       </div>
+      
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+          onClick={handleCloseLightbox}
+        >
+          <div className="flex items-center justify-between p-4 bg-black/50">
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+                disabled={zoomLevel <= 0.5}
+                data-testid="button-zoom-out"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </Button>
+              <span className="text-sm text-white/70 w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+                disabled={zoomLevel >= 3}
+                data-testid="button-zoom-in"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+                data-testid="button-reset-zoom"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+                data-testid="button-download-image"
+              >
+                <Download className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={handleCloseLightbox}
+                data-testid="button-close-lightbox"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+          
+          <div 
+            className="flex-1 flex items-center justify-center overflow-auto p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage}
+              alt="Full preview"
+              className="max-w-none transition-transform duration-200"
+              style={{ transform: `scale(${zoomLevel})` }}
+              draggable={false}
+            />
+          </div>
+          
+          <div className="p-4 bg-black/50 text-center">
+            <p className="text-sm text-white/50">Press Esc or click outside to close</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
