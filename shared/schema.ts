@@ -34,6 +34,13 @@ export const aiProviders = [
 
 export type AIProvider = (typeof aiProviders)[number];
 
+// Free providers that don't require API keys
+export const freeProviders: AIProvider[] = ["pollinations", "huggingface"];
+
+// Provider status for fallback system
+export const providerStatusEnum = z.enum(["active", "temporarily_blocked", "depleted"]);
+export type ProviderStatus = z.infer<typeof providerStatusEnum>;
+
 // API Settings schema - supports multiple instances per provider
 export const apiSettingSchema = z.object({
   id: z.string(),
@@ -41,10 +48,14 @@ export const apiSettingSchema = z.object({
   instanceName: z.string(), // e.g., "Google Veo 1", "Google Veo 2"
   apiKey: z.string(),
   isConnected: z.boolean().default(false),
+  priority: z.number().default(0), // Lower number = higher priority
+  status: providerStatusEnum.default("active"),
+  lastFailureAt: z.string().optional(), // ISO timestamp
+  failureReason: z.string().optional(),
 });
 
 export type APISetting = z.infer<typeof apiSettingSchema>;
-export type InsertAPISetting = Omit<APISetting, "id" | "isConnected">;
+export type InsertAPISetting = Omit<APISetting, "id" | "isConnected" | "priority" | "status" | "lastFailureAt" | "failureReason">;
 
 // Tile types
 export type TileType = "image" | "video";
@@ -168,7 +179,14 @@ export const insertTileLinkSchema = tileLinkSchema.omit({ id: true });
 export const insertLinkedSegmentSchema = linkedSegmentSchema.omit({ id: true });
 export const insertAudioTrackSchema = audioTrackSchema.omit({ id: true });
 export const insertAudioClipSchema = audioClipSchema.omit({ id: true });
-export const insertApiSettingSchema = apiSettingSchema.omit({ id: true, isConnected: true });
+export const insertApiSettingSchema = apiSettingSchema.omit({ 
+  id: true, 
+  isConnected: true, 
+  priority: true, 
+  status: true, 
+  lastFailureAt: true, 
+  failureReason: true 
+});
 
 // Legacy user schema for compatibility
 import { sql } from "drizzle-orm";

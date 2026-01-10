@@ -282,7 +282,8 @@ export async function registerRoutes(
   // API Settings
   app.get("/api/settings", async (req, res) => {
     const settings = await storage.getApiSettings();
-    const sanitized = settings.map((s) => ({
+    const sorted = settings.sort((a, b) => a.priority - b.priority);
+    const sanitized = sorted.map((s) => ({
       ...s,
       apiKey: s.apiKey ? "••••••••" : "",
     }));
@@ -371,6 +372,24 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Setting not found" });
     }
     res.status(204).send();
+  });
+
+  app.post("/api/settings/reorder", async (req, res) => {
+    try {
+      const { orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: "orderedIds must be an array" });
+      }
+      const reordered = await storage.reorderApiSettings(orderedIds);
+      const sanitized = reordered.map((s) => ({
+        ...s,
+        apiKey: s.apiKey ? "••••••••" : "",
+      }));
+      res.json(sanitized);
+    } catch (error) {
+      console.error("[Settings Reorder] Error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   // Generation endpoints

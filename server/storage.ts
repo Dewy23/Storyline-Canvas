@@ -66,7 +66,9 @@ export interface IStorage {
   getApiSettings(): Promise<APISetting[]>;
   getApiSettingById(id: string): Promise<APISetting | undefined>;
   getApiSettingsByProvider(provider: string): Promise<APISetting[]>;
+  getNextPriority(): Promise<number>;
   saveApiSetting(setting: InsertAPISetting): Promise<APISetting>;
+  reorderApiSettings(orderedIds: string[]): Promise<APISetting[]>;
   updateApiSetting(id: string, updates: Partial<APISetting>): Promise<APISetting | undefined>;
   deleteApiSettingById(id: string): Promise<boolean>;
 }
@@ -323,17 +325,39 @@ export class MemStorage implements IStorage {
     return Array.from(this.apiSettings.values()).filter((s) => s.provider === provider);
   }
 
+  async getNextPriority(): Promise<number> {
+    const settings = Array.from(this.apiSettings.values());
+    if (settings.length === 0) return 0;
+    return Math.max(...settings.map(s => s.priority)) + 1;
+  }
+
   async saveApiSetting(insertSetting: InsertAPISetting): Promise<APISetting> {
     const id = randomUUID();
+    const nextPriority = await this.getNextPriority();
     const setting: APISetting = { 
       id,
       provider: insertSetting.provider,
       instanceName: insertSetting.instanceName,
       apiKey: insertSetting.apiKey,
-      isConnected: insertSetting.apiKey ? true : false 
+      isConnected: insertSetting.apiKey ? true : false,
+      priority: nextPriority,
+      status: "active",
     };
     this.apiSettings.set(id, setting);
     return setting;
+  }
+
+  async reorderApiSettings(orderedIds: string[]): Promise<APISetting[]> {
+    const results: APISetting[] = [];
+    for (let i = 0; i < orderedIds.length; i++) {
+      const existing = this.apiSettings.get(orderedIds[i]);
+      if (existing) {
+        const updated = { ...existing, priority: i };
+        this.apiSettings.set(orderedIds[i], updated);
+        results.push(updated);
+      }
+    }
+    return results;
   }
 
   async updateApiSetting(id: string, updates: Partial<APISetting>): Promise<APISetting | undefined> {
