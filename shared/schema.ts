@@ -34,10 +34,11 @@ export const aiProviders = [
 
 export type AIProvider = (typeof aiProviders)[number];
 
-// API Settings schema
+// API Settings schema - supports multiple instances per provider
 export const apiSettingSchema = z.object({
   id: z.string(),
   provider: z.enum(aiProviders),
+  instanceName: z.string(), // e.g., "Google Veo 1", "Google Veo 2"
   apiKey: z.string(),
   isConnected: z.boolean().default(false),
 });
@@ -57,6 +58,7 @@ export const tileSchema = z.object({
   position: z.number(),
   prompt: z.string().default(""),
   provider: z.enum(aiProviders).optional(),
+  providerInstanceId: z.string().optional(), // ID of the API setting instance to use
   model: z.string().optional(),
   mediaUrl: z.string().optional(),
   selectedFrame: z.number().default(0),

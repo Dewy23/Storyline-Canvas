@@ -20,42 +20,21 @@ interface TileProps {
   isLinked?: boolean;
 }
 
-const providerLabels: Record<AIProvider, string> = {
-  // Image providers
-  openai: "OpenAI (DALL-E)",
-  gemini: "Google Gemini",
-  stability: "Stability AI",
-  flux: "Flux",
-  ideogram: "Ideogram",
-  hunyuan: "Hunyuan",
-  firefly: "Adobe Firefly",
-  bria: "Bria.ai",
-  pollinations: "Pollinations.ai",
-  runware: "Runware",
-  // Video providers
-  runway: "Runway ML",
-  veo: "Google Veo",
-  kling: "Kling",
-  pika: "Pika Labs",
-  luma: "Luma",
-  tavus: "Tavus",
-  mootion: "Mootion",
-  akool: "Akool",
-  mirage: "Mirage",
-  pictory: "Pictory",
-  // Multi/Audio
-  replicate: "Replicate",
-  elevenlabs: "ElevenLabs",
-  dalle3: "DALL-E 3",
-  huggingface: "Hugging Face",
-};
-
-// Free providers that don't require API keys
+// Free providers that don't require API keys (built-in, no settings required)
 const FREE_PROVIDERS: AIProvider[] = ["pollinations"];
 
-// All available providers (filter by connected status at runtime)
-const imageProviders: AIProvider[] = ["pollinations", "openai", "gemini", "stability", "flux", "ideogram", "huggingface", "hunyuan", "firefly", "bria", "runware", "replicate"];
-const videoProviders: AIProvider[] = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
+// All provider types by category
+const imageProviderTypes: AIProvider[] = ["pollinations", "openai", "gemini", "stability", "flux", "ideogram", "huggingface", "hunyuan", "firefly", "bria", "runware", "replicate"];
+const videoProviderTypes: AIProvider[] = ["runway", "veo", "kling", "pika", "luma", "tavus", "mootion", "akool", "mirage", "pictory", "replicate"];
+
+// Built-in free provider entry (always available, no settings needed)
+const BUILTIN_POLLINATIONS = {
+  id: "__pollinations__",
+  provider: "pollinations" as AIProvider,
+  instanceName: "Pollinations.ai (Free)",
+  apiKey: "",
+  isConnected: true,
+};
 
 export function Tile({
   tile,
@@ -71,20 +50,25 @@ export function Tile({
   const { updateTile, selectedTileId, setSelectedTileId, apiSettings, setSettingsOpen } = useAppStore();
   const queryClient = useQueryClient();
   const isSelected = selectedTileId === tile.id;
-  const allProviders = tile.type === "image" ? imageProviders : videoProviders;
   
-  // Free providers for this tile type (always available)
-  const freeProvidersForType = FREE_PROVIDERS.filter(p => allProviders.includes(p));
+  // Get provider types for this tile type
+  const providerTypesForTile = tile.type === "image" ? imageProviderTypes : videoProviderTypes;
   
-  // Connected key-based providers
-  const connectedKeyProviders = allProviders.filter((p) => 
-    !FREE_PROVIDERS.includes(p) && apiSettings.some((s) => s.provider === p && s.isConnected)
-  );
+  // Build list of available provider instances:
+  // 1. Built-in free providers (Pollinations for images)
+  // 2. Connected settings from apiSettings that match tile type (only show connected ones)
+  const availableInstances = [
+    ...(tile.type === "image" ? [BUILTIN_POLLINATIONS] : []),
+    ...apiSettings.filter((s) => 
+      providerTypesForTile.includes(s.provider) && s.isConnected
+    ),
+  ];
   
-  // Combined: free providers first, then connected key-based providers
-  const availableProviders = [...freeProvidersForType, ...connectedKeyProviders];
+  const hasAvailableProviders = availableInstances.length > 0;
   
-  const hasAvailableProviders = availableProviders.length > 0;
+  // Get current selected instance
+  const currentInstanceId = tile.providerInstanceId || (tile.type === "image" ? "__pollinations__" : "");
+  const currentInstance = availableInstances.find((i) => i.id === currentInstanceId);
 
   const hasPreviousVideo = tile.type === "image" && previousVideoTile?.mediaUrl;
   const hasAboveImage = tile.type === "video" && aboveImageTile?.mediaUrl;
@@ -100,17 +84,31 @@ export function Tile({
     },
   });
 
-  // Auto-select first available provider when tile.provider is invalid or missing
+  // Auto-select first available instance when current selection is invalid
+  // Only runs when there are available instances and no valid current selection
   useEffect(() => {
-    if (hasAvailableProviders) {
-      const currentProviderIsValid = tile.provider && availableProviders.includes(tile.provider);
-      if (!currentProviderIsValid) {
-        const firstAvailable = availableProviders[0];
-        updateTile(tile.id, { provider: firstAvailable });
-        updateTileMutation.mutate({ id: tile.id, updates: { provider: firstAvailable } });
-      }
-    }
-  }, [hasAvailableProviders, availableProviders.join(','), tile.id, tile.provider]);
+    if (availableInstances.length === 0) return; // No providers available, nothing to auto-select
+    if (currentInstance) return; // Already have a valid selection
+    
+    const firstInstance = availableInstances[0];
+    const newInstanceId = firstInstance.id;
+    const newProvider = firstInstance.provider;
+    
+    // Skip if already set to avoid loops
+    if (tile.providerInstanceId === newInstanceId && tile.provider === newProvider) return;
+    
+    updateTile(tile.id, { 
+      provider: newProvider, 
+      providerInstanceId: newInstanceId 
+    });
+    updateTileMutation.mutate({ 
+      id: tile.id, 
+      updates: { 
+        provider: newProvider,
+        providerInstanceId: newInstanceId 
+      } 
+    });
+  }, [availableInstances.length, currentInstance, tile.id, tile.providerInstanceId, tile.provider]);
 
   const handlePromptChange = (value: string) => {
     updateTile(tile.id, { prompt: value });
@@ -120,9 +118,26 @@ export function Tile({
     updateTileMutation.mutate({ id: tile.id, updates: { prompt: tile.prompt } });
   };
 
-  const handleProviderChange = (value: string) => {
-    updateTile(tile.id, { provider: value as AIProvider });
-    updateTileMutation.mutate({ id: tile.id, updates: { provider: value as AIProvider } });
+  const handleInstanceChange = (instanceId: string) => {
+    if (instanceId === "__manage_providers__") {
+      setSettingsOpen(true);
+      return;
+    }
+    const instance = availableInstances.find((i) => i.id === instanceId);
+    // Only allow selecting connected instances (validated API keys)
+    if (instance && instance.isConnected) {
+      updateTile(tile.id, { 
+        provider: instance.provider, 
+        providerInstanceId: instance.id 
+      });
+      updateTileMutation.mutate({ 
+        id: tile.id, 
+        updates: { 
+          provider: instance.provider,
+          providerInstanceId: instance.id 
+        } 
+      });
+    }
   };
 
   const handleFrameChange = (value: number[]) => {
@@ -288,31 +303,29 @@ export function Tile({
               {hasAvailableProviders ? (
                 <>
                   <Select
-                    value={tile.provider && availableProviders.includes(tile.provider) ? tile.provider : availableProviders[0]}
-                    onValueChange={(value) => {
-                      if (value === "__manage_providers__") {
-                        setSettingsOpen(true);
-                      } else {
-                        handleProviderChange(value);
-                      }
-                    }}
+                    value={currentInstanceId}
+                    onValueChange={handleInstanceChange}
                   >
                     <SelectTrigger className="h-8 text-xs" data-testid={`select-provider-${tile.id}`}>
-                      <SelectValue placeholder="Select provider" />
+                      <SelectValue placeholder="Select provider">
+                        {currentInstance?.instanceName || "Select provider"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {availableProviders.map((provider) => {
-                        const isFree = FREE_PROVIDERS.includes(provider);
+                      {availableInstances.map((instance) => {
+                        const isFree = FREE_PROVIDERS.includes(instance.provider);
                         return (
-                          <SelectItem key={provider} value={provider} className="text-xs">
+                          <SelectItem key={instance.id} value={instance.id} className="text-xs">
                             <span className="flex items-center gap-2">
-                              {providerLabels[provider]}
+                              {instance.instanceName}
                               {isFree ? (
                                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-500/20 text-green-600 dark:text-green-400 rounded">
                                   Free
                                 </span>
-                              ) : (
+                              ) : instance.isConnected ? (
                                 <span className="w-2 h-2 rounded-full bg-green-500" title="API key connected" />
+                              ) : (
+                                <span className="w-2 h-2 rounded-full bg-yellow-500" title="Key pending" />
                               )}
                             </span>
                           </SelectItem>

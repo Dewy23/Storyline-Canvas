@@ -332,8 +332,41 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/settings/:provider", async (req, res) => {
-    const deleted = await storage.deleteApiSetting(req.params.provider);
+  app.patch("/api/settings/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const updates = req.body;
+      
+      if (updates.apiKey) {
+        const existingSetting = await storage.getApiSettingById(id);
+        if (existingSetting) {
+          const validation = await validateApiKey(existingSetting.provider, updates.apiKey);
+          if (!validation.valid) {
+            return res.status(400).json({ 
+              error: validation.error || "Invalid API key",
+              validated: false,
+            });
+          }
+          updates.isConnected = true;
+        }
+      }
+      
+      const setting = await storage.updateApiSetting(id, updates);
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      res.json({
+        ...setting,
+        apiKey: setting.apiKey ? "••••••••" : "",
+      });
+    } catch (error) {
+      console.error("[Settings Update] Error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/settings/:id", async (req, res) => {
+    const deleted = await storage.deleteApiSettingById(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Setting not found" });
     }

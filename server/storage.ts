@@ -64,9 +64,11 @@ export interface IStorage {
 
   // API Settings
   getApiSettings(): Promise<APISetting[]>;
-  getApiSetting(provider: string): Promise<APISetting | undefined>;
+  getApiSettingById(id: string): Promise<APISetting | undefined>;
+  getApiSettingsByProvider(provider: string): Promise<APISetting[]>;
   saveApiSetting(setting: InsertAPISetting): Promise<APISetting>;
-  deleteApiSetting(provider: string): Promise<boolean>;
+  updateApiSetting(id: string, updates: Partial<APISetting>): Promise<APISetting | undefined>;
+  deleteApiSettingById(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -313,40 +315,40 @@ export class MemStorage implements IStorage {
     return Array.from(this.apiSettings.values());
   }
 
-  async getApiSetting(provider: string): Promise<APISetting | undefined> {
-    return Array.from(this.apiSettings.values()).find((s) => s.provider === provider);
+  async getApiSettingById(id: string): Promise<APISetting | undefined> {
+    return this.apiSettings.get(id);
+  }
+
+  async getApiSettingsByProvider(provider: string): Promise<APISetting[]> {
+    return Array.from(this.apiSettings.values()).filter((s) => s.provider === provider);
   }
 
   async saveApiSetting(insertSetting: InsertAPISetting): Promise<APISetting> {
-    const existing = Array.from(this.apiSettings.values()).find(
-      (s) => s.provider === insertSetting.provider
-    );
-    
-    if (existing) {
-      const updated: APISetting = { 
-        ...existing, 
-        apiKey: insertSetting.apiKey,
-        isConnected: insertSetting.apiKey ? true : false 
-      };
-      this.apiSettings.set(existing.id, updated);
-      return updated;
-    }
-
     const id = randomUUID();
     const setting: APISetting = { 
+      id,
       provider: insertSetting.provider,
+      instanceName: insertSetting.instanceName,
       apiKey: insertSetting.apiKey,
-      id, 
       isConnected: insertSetting.apiKey ? true : false 
     };
     this.apiSettings.set(id, setting);
     return setting;
   }
 
-  async deleteApiSetting(provider: string): Promise<boolean> {
-    const setting = Array.from(this.apiSettings.values()).find((s) => s.provider === provider);
-    if (!setting) return false;
-    return this.apiSettings.delete(setting.id);
+  async updateApiSetting(id: string, updates: Partial<APISetting>): Promise<APISetting | undefined> {
+    const existing = this.apiSettings.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    if (updates.apiKey !== undefined) {
+      updated.isConnected = !!updates.apiKey;
+    }
+    this.apiSettings.set(id, updated);
+    return updated;
+  }
+
+  async deleteApiSettingById(id: string): Promise<boolean> {
+    return this.apiSettings.delete(id);
   }
 }
 

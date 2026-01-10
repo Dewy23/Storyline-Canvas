@@ -45,7 +45,9 @@ interface AppState {
   
   apiSettings: APISetting[];
   setApiSettings: (settings: APISetting[]) => void;
-  updateApiSetting: (provider: AIProvider, updates: Partial<APISetting>) => void;
+  addApiSetting: (setting: APISetting) => void;
+  removeApiSetting: (id: string) => void;
+  updateApiSettingInStore: (id: string, updates: Partial<APISetting>) => void;
   
   selectedTileId: string | null;
   setSelectedTileId: (id: string | null) => void;
@@ -142,9 +144,13 @@ export const useAppStore = create<AppState>((set) => ({
   
   apiSettings: [],
   setApiSettings: (settings) => set({ apiSettings: settings }),
-  updateApiSetting: (provider, updates) => set((state) => ({
+  addApiSetting: (setting) => set((state) => ({ apiSettings: [...state.apiSettings, setting] })),
+  removeApiSetting: (id) => set((state) => ({
+    apiSettings: state.apiSettings.filter((s) => s.id !== id)
+  })),
+  updateApiSettingInStore: (id, updates) => set((state) => ({
     apiSettings: state.apiSettings.map((s) => 
-      s.provider === provider ? { ...s, ...updates } : s
+      s.id === id ? { ...s, ...updates } : s
     )
   })),
   
