@@ -355,33 +355,43 @@ export async function registerRoutes(
     try {
       const data = generateSchema.parse(req.body);
       let provider = data.provider || "pollinations";
+      let apiKey = "";
       
       const settings = await storage.getApiSettings();
       
-      // Free providers don't need API key validation
-      const isFreeProvider = FREE_IMAGE_PROVIDERS.includes(provider);
-      
-      if (!isFreeProvider) {
+      // Check if the requested provider is a free provider
+      if (FREE_IMAGE_PROVIDERS.includes(provider)) {
+        // Free providers don't need API keys
+        apiKey = "";
+        console.log(`[Generate Image] Using free provider: ${provider}`);
+      } else {
+        // Key-based provider - check if connected
         const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
         
-        if (!providerSetting) {
-          const fallbackProvider = settings.find((s) => 
-            ["stability", "flux", "openai", "dalle3", "replicate"].includes(s.provider) && s.isConnected
+        if (providerSetting) {
+          // Found connected provider with key
+          apiKey = providerSetting.apiKey;
+          console.log(`[Generate Image] Using connected provider: ${provider}`);
+        } else {
+          // Provider not connected - try fallback to another connected provider
+          const fallbackSetting = settings.find((s) => 
+            ["stability", "flux", "openai", "dalle3", "replicate", "gemini", "ideogram", "huggingface"].includes(s.provider) && s.isConnected
           );
           
-          if (!fallbackProvider) {
-            // Default to Pollinations as free fallback
-            provider = "pollinations";
+          if (fallbackSetting) {
+            provider = fallbackSetting.provider;
+            apiKey = fallbackSetting.apiKey;
+            console.log(`[Generate Image] Falling back to connected provider: ${provider}`);
           } else {
-            provider = fallbackProvider.provider;
+            // No connected key-based providers - fall back to free Pollinations
+            provider = "pollinations";
+            apiKey = "";
+            console.log(`[Generate Image] No connected providers, using free Pollinations`);
           }
         }
       }
       
       console.log(`[Generate Image] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
-      
-      // Free providers pass empty string, they don't need keys
-      const apiKey = isFreeProvider ? "" : (settings.find((s) => s.provider === provider)?.apiKey || "");
       
       const result = await generateImage(provider, data.prompt, apiKey, data.referenceImageUrl);
       
@@ -424,31 +434,41 @@ export async function registerRoutes(
     try {
       const data = generateSchema.parse(req.body);
       let provider = data.provider || "runway";
+      let apiKey = "";
       
       const settings = await storage.getApiSettings();
+      
+      // Check if the requested provider is connected
       const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
       
-      if (!providerSetting) {
-        const fallbackProvider = settings.find((s) => 
-          ["runway", "kling", "pika", "luma", "replicate"].includes(s.provider) && s.isConnected
+      if (providerSetting) {
+        // Found connected provider with key
+        apiKey = providerSetting.apiKey;
+        console.log(`[Generate Video] Using connected provider: ${provider}`);
+      } else {
+        // Provider not connected - try fallback to another connected video provider
+        const fallbackSetting = settings.find((s) => 
+          ["runway", "kling", "pika", "luma", "veo", "replicate"].includes(s.provider) && s.isConnected
         );
         
-        if (!fallbackProvider) {
-          console.log(`[Generate Video] No connected provider, using placeholder`);
+        if (fallbackSetting) {
+          provider = fallbackSetting.provider;
+          apiKey = fallbackSetting.apiKey;
+          console.log(`[Generate Video] Falling back to connected provider: ${provider}`);
+        } else {
+          // No connected video providers - return placeholder
+          console.log(`[Generate Video] No connected video providers, using placeholder`);
           await new Promise((resolve) => setTimeout(resolve, 2000));
           return res.json({
             success: true,
             mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
             provider: "placeholder",
-            message: "No AI provider connected - showing placeholder",
+            message: "No video AI provider connected. Add Runway, Luma, or Veo API key in Settings.",
           });
         }
-        provider = fallbackProvider.provider;
       }
       
       console.log(`[Generate Video] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
-      
-      const apiKey = providerSetting?.apiKey || settings.find((s) => s.provider === provider)?.apiKey || "";
       
       const result = await generateVideo(provider, data.prompt, apiKey, data.referenceImageUrl);
       
