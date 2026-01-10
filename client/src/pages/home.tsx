@@ -6,13 +6,8 @@ import { SettingsModal } from "@/components/settings-modal";
 import { ExportModal } from "@/components/export-modal";
 import { useAppStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
-import type { Timeline, Tile, TileLink, LinkedSegment, AudioTrack, AudioClip, APISetting, AIProvider } from "@shared/schema";
-import { aiProviders } from "@shared/schema";
+import type { Timeline, Tile, TileLink, LinkedSegment, AudioTrack, AudioClip, APISetting } from "@shared/schema";
 import { Loader2 } from "lucide-react";
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 15);
-}
 
 export default function Home() {
   const { 
@@ -148,17 +143,6 @@ export default function Home() {
     }
   }, [tilesLoading, tilesData, timelines]);
 
-  useEffect(() => {
-    if (apiSettings.length === 0 && !settingsLoading) {
-      const initialSettings: APISetting[] = aiProviders.map((provider) => ({
-        id: generateId(),
-        provider,
-        apiKey: "",
-        isConnected: false,
-      }));
-      setApiSettings(initialSettings);
-    }
-  }, [apiSettings, settingsLoading, setApiSettings]);
 
   const isLoading = timelinesLoading || tilesLoading || tracksLoading || clipsLoading;
 
