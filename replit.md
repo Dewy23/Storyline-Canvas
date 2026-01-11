@@ -6,6 +6,15 @@ StoryForge AI is an AI-powered video editor focused on consistent character stor
 
 ## Recent Changes (January 2026)
 
+- **Provider Priority & Fallback System**: Automatic failover when subscriptions run out
+  - Priority ordering: Paid providers appear above free ones, users can reorder with up/down buttons
+  - Automatic fallback: When a provider fails (quota exceeded, rate limited), system tries next provider in priority order
+  - Status tracking: Providers marked as "depleted" or "temporarily_blocked" with automatic recovery on successful retry
+  - Free providers (Pollinations, Hugging Face) always available as fallback
+  - Settings modal shows two sections: "Your Providers" (reorderable) and "Free Providers (Always Available)"
+- **Multi-instance Provider Support**: Add same provider multiple times with different API keys
+  - Custom naming (e.g., "Google Veo 1", "Google Veo 2")
+  - Instance-based selection in tile dropdowns
 - **Custom CSS Grid Workspace**: Replaced GoldenLayout with a lightweight custom CSS Grid layout system
   - Full-length resizable separators with 24px hover zones for easy drag-to-resize
   - Mouse event-based resizing with row-resize/col-resize cursors

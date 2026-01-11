@@ -392,86 +392,218 @@ export async function registerRoutes(
     }
   });
 
+  // Reset provider status (for manual recovery)
+  app.post("/api/settings/:id/reset-status", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const setting = await storage.updateApiSetting(id, {
+        status: "active",
+        lastFailureAt: undefined,
+        failureReason: undefined,
+      });
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      res.json({
+        ...setting,
+        apiKey: setting.apiKey ? "••••••••" : "",
+      });
+    } catch (error) {
+      console.error("[Settings Reset Status] Error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Generation endpoints
   const generateSchema = z.object({
     prompt: z.string(),
     provider: z.string().optional(),
+    providerInstanceId: z.string().optional(),
     tileId: z.string(),
     referenceImageUrl: z.string().optional(),
   });
 
   // Free providers that don't require API keys
-  const FREE_IMAGE_PROVIDERS = ["pollinations"];
+  const FREE_IMAGE_PROVIDERS = ["pollinations", "huggingface"];
+  const IMAGE_PROVIDERS = ["stability", "flux", "openai", "dalle3", "replicate", "gemini", "ideogram", "huggingface", "pollinations"];
+
+  // Check if error indicates quota/rate limit issues
+  function isQuotaOrRateLimitError(error: string): { isDepleted: boolean; isRateLimited: boolean } {
+    const lowerError = error.toLowerCase();
+    const isDepleted = lowerError.includes("quota") || lowerError.includes("insufficient") || 
+                       lowerError.includes("exceeded") || lowerError.includes("limit reached") ||
+                       lowerError.includes("billing") || lowerError.includes("payment");
+    const isRateLimited = lowerError.includes("rate limit") || lowerError.includes("too many requests") ||
+                          lowerError.includes("throttl");
+    return { isDepleted, isRateLimited };
+  }
+
+  // Update provider status on failure
+  async function updateProviderStatusOnFailure(settingId: string, error: string) {
+    const { isDepleted, isRateLimited } = isQuotaOrRateLimitError(error);
+    if (isDepleted) {
+      await storage.updateApiSetting(settingId, {
+        status: "depleted",
+        lastFailureAt: new Date().toISOString(),
+        failureReason: error,
+      });
+      console.log(`[Provider] Marked ${settingId} as depleted`);
+    } else if (isRateLimited) {
+      await storage.updateApiSetting(settingId, {
+        status: "temporarily_blocked",
+        lastFailureAt: new Date().toISOString(),
+        failureReason: error,
+      });
+      console.log(`[Provider] Marked ${settingId} as rate limited`);
+    }
+    return { isDepleted, isRateLimited };
+  }
+
+  // Check if a provider can be retried (cooldown expired)
+  const RATE_LIMIT_COOLDOWN_MS = 60 * 1000; // 1 minute for rate limits
+  const DEPLETED_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours for depleted (quota exhausted)
+
+  function canRetryProvider(setting: { status?: string; lastFailureAt?: string }): boolean {
+    if (setting.status === "active") return true;
+    if (!setting.lastFailureAt) return true;
+    
+    const lastFailure = new Date(setting.lastFailureAt).getTime();
+    const now = Date.now();
+    
+    if (setting.status === "temporarily_blocked") {
+      return now - lastFailure > RATE_LIMIT_COOLDOWN_MS;
+    }
+    if (setting.status === "depleted") {
+      return now - lastFailure > DEPLETED_COOLDOWN_MS;
+    }
+    return true;
+  }
+
+  // Get providers sorted by priority, include providers past their cooldown period
+  async function getImageProvidersInPriorityOrder(): Promise<Array<{ id: string; provider: string; apiKey: string; isFree: boolean }>> {
+    const settings = await storage.getApiSettings();
+    const imageSettings = settings
+      .filter((s) => IMAGE_PROVIDERS.includes(s.provider) && s.isConnected && (s.status === "active" || canRetryProvider(s)))
+      .sort((a, b) => {
+        // Active providers first
+        if (a.status === "active" && b.status !== "active") return -1;
+        if (a.status !== "active" && b.status === "active") return 1;
+        // Then by priority
+        return a.priority - b.priority;
+      });
+    
+    // Separate paid and free
+    const paidProviders = imageSettings
+      .filter((s) => !FREE_IMAGE_PROVIDERS.includes(s.provider))
+      .map((s) => ({ id: s.id, provider: s.provider, apiKey: s.apiKey, isFree: false }));
+    
+    const freeProviders = imageSettings
+      .filter((s) => FREE_IMAGE_PROVIDERS.includes(s.provider))
+      .map((s) => ({ id: s.id, provider: s.provider, apiKey: s.apiKey, isFree: true }));
+    
+    // Always include Pollinations as ultimate fallback
+    if (!freeProviders.some((p) => p.provider === "pollinations")) {
+      freeProviders.push({ id: "__pollinations__", provider: "pollinations", apiKey: "", isFree: true });
+    }
+    
+    return [...paidProviders, ...freeProviders];
+  }
 
   app.post("/api/generate/image", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
-      let provider = data.provider || "pollinations";
-      let apiKey = "";
+      const providersToTry = await getImageProvidersInPriorityOrder();
       
-      const settings = await storage.getApiSettings();
+      // If specific instance requested, try that first (even if non-active - user explicitly selected it)
+      if (data.providerInstanceId) {
+        const settings = await storage.getApiSettings();
+        const specificSetting = settings.find((s) => s.id === data.providerInstanceId);
+        if (specificSetting && specificSetting.isConnected) {
+          // Remove from existing position if present
+          const existing = providersToTry.findIndex((p) => p.id === specificSetting.id);
+          if (existing >= 0) {
+            providersToTry.splice(existing, 1);
+          }
+          // Add at front regardless of status - user explicitly requested this provider
+          providersToTry.unshift({
+            id: specificSetting.id,
+            provider: specificSetting.provider,
+            apiKey: specificSetting.apiKey,
+            isFree: FREE_IMAGE_PROVIDERS.includes(specificSetting.provider),
+          });
+        }
+      }
       
-      // Check if the requested provider is a free provider
-      if (FREE_IMAGE_PROVIDERS.includes(provider)) {
-        // Free providers don't need API keys
-        apiKey = "";
-        console.log(`[Generate Image] Using free provider: ${provider}`);
-      } else {
-        // Key-based provider - check if connected
-        const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
+      let lastError = "";
+      let usedProvider = "";
+      let usedProviderId = "";
+      
+      for (const providerInfo of providersToTry) {
+        console.log(`[Generate Image] Trying provider: ${providerInfo.provider} (${providerInfo.id})`);
         
-        if (providerSetting) {
-          // Found connected provider with key
-          apiKey = providerSetting.apiKey;
-          console.log(`[Generate Image] Using connected provider: ${provider}`);
-        } else {
-          // Provider not connected - try fallback to another connected provider
-          const fallbackSetting = settings.find((s) => 
-            ["stability", "flux", "openai", "dalle3", "replicate", "gemini", "ideogram", "huggingface"].includes(s.provider) && s.isConnected
-          );
+        try {
+          const result = await generateImage(providerInfo.provider, data.prompt, providerInfo.apiKey, data.referenceImageUrl);
           
-          if (fallbackSetting) {
-            provider = fallbackSetting.provider;
-            apiKey = fallbackSetting.apiKey;
-            console.log(`[Generate Image] Falling back to connected provider: ${provider}`);
-          } else {
-            // No connected key-based providers - fall back to free Pollinations
-            provider = "pollinations";
-            apiKey = "";
-            console.log(`[Generate Image] No connected providers, using free Pollinations`);
+          if (result.success) {
+            usedProvider = providerInfo.provider;
+            usedProviderId = providerInfo.id;
+            
+            // Reset provider status to active on successful generation
+            if (providerInfo.id !== "__pollinations__") {
+              await storage.updateApiSetting(providerInfo.id, {
+                status: "active",
+                lastFailureAt: undefined,
+                failureReason: undefined,
+              });
+            }
+            
+            if (result.jobId) {
+              storeJob(data.tileId, providerInfo.provider, result.jobId, "image");
+              return res.json({
+                success: true,
+                jobId: result.jobId,
+                provider: providerInfo.provider,
+                providerId: providerInfo.id,
+                status: "processing",
+                message: "Generation started",
+              });
+            }
+            
+            return res.json({
+              success: true,
+              mediaUrl: result.mediaUrl,
+              provider: providerInfo.provider,
+              providerId: providerInfo.id,
+              message: `Image generated with ${providerInfo.provider}`,
+            });
+          }
+          
+          lastError = result.error || "Unknown error";
+          console.log(`[Generate Image] ${providerInfo.provider} failed: ${lastError}`);
+          
+          // Update provider status if it's a quota/rate limit issue
+          if (providerInfo.id !== "__pollinations__") {
+            const statusUpdate = await updateProviderStatusOnFailure(providerInfo.id, lastError);
+            if (statusUpdate.isDepleted || statusUpdate.isRateLimited) {
+              continue; // Try next provider
+            }
+          }
+        } catch (providerError: any) {
+          lastError = providerError.message || "Provider error";
+          console.log(`[Generate Image] ${providerInfo.provider} threw error: ${lastError}`);
+          
+          if (providerInfo.id !== "__pollinations__") {
+            await updateProviderStatusOnFailure(providerInfo.id, lastError);
           }
         }
       }
       
-      console.log(`[Generate Image] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
-      
-      const result = await generateImage(provider, data.prompt, apiKey, data.referenceImageUrl);
-      
-      if (!result.success) {
-        console.error(`[Generate Image] Error: ${result.error}`);
-        return res.status(500).json({ 
-          success: false, 
-          error: result.error,
-          provider,
-        });
-      }
-      
-      if (result.jobId) {
-        storeJob(data.tileId, provider, result.jobId, "image");
-        return res.json({
-          success: true,
-          jobId: result.jobId,
-          provider,
-          status: "processing",
-          message: "Generation started",
-        });
-      }
-      
-      res.json({
-        success: true,
-        mediaUrl: result.mediaUrl,
-        provider,
-        message: `Image generated with ${provider}`,
+      // All providers failed
+      console.error(`[Generate Image] All providers failed. Last error: ${lastError}`);
+      return res.status(500).json({ 
+        success: false, 
+        error: lastError || "All providers failed",
+        provider: usedProvider,
       });
     } catch (error) {
       console.error("[Generate Image] Error:", error);
@@ -482,73 +614,112 @@ export async function registerRoutes(
     }
   });
 
+  const VIDEO_PROVIDERS = ["runway", "kling", "pika", "luma", "veo", "replicate"];
+
+  // Get video providers sorted by priority, include providers past their cooldown period
+  async function getVideoProvidersInPriorityOrder(): Promise<Array<{ id: string; provider: string; apiKey: string }>> {
+    const settings = await storage.getApiSettings();
+    return settings
+      .filter((s) => VIDEO_PROVIDERS.includes(s.provider) && s.isConnected && (s.status === "active" || canRetryProvider(s)))
+      .sort((a, b) => {
+        // Active providers first
+        if (a.status === "active" && b.status !== "active") return -1;
+        if (a.status !== "active" && b.status === "active") return 1;
+        // Then by priority
+        return a.priority - b.priority;
+      })
+      .map((s) => ({ id: s.id, provider: s.provider, apiKey: s.apiKey }));
+  }
+
   app.post("/api/generate/video", async (req, res) => {
     try {
       const data = generateSchema.parse(req.body);
-      let provider = data.provider || "runway";
-      let apiKey = "";
+      const providersToTry = await getVideoProvidersInPriorityOrder();
       
-      const settings = await storage.getApiSettings();
-      
-      // Check if the requested provider is connected
-      const providerSetting = settings.find((s) => s.provider === provider && s.isConnected);
-      
-      if (providerSetting) {
-        // Found connected provider with key
-        apiKey = providerSetting.apiKey;
-        console.log(`[Generate Video] Using connected provider: ${provider}`);
-      } else {
-        // Provider not connected - try fallback to another connected video provider
-        const fallbackSetting = settings.find((s) => 
-          ["runway", "kling", "pika", "luma", "veo", "replicate"].includes(s.provider) && s.isConnected
-        );
-        
-        if (fallbackSetting) {
-          provider = fallbackSetting.provider;
-          apiKey = fallbackSetting.apiKey;
-          console.log(`[Generate Video] Falling back to connected provider: ${provider}`);
-        } else {
-          // No connected video providers - return placeholder
-          console.log(`[Generate Video] No connected video providers, using placeholder`);
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          return res.json({
-            success: true,
-            mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
-            provider: "placeholder",
-            message: "No video AI provider connected. Add Runway, Luma, or Veo API key in Settings.",
+      // If specific instance requested, try that first (even if non-active - user explicitly selected it)
+      if (data.providerInstanceId) {
+        const settings = await storage.getApiSettings();
+        const specificSetting = settings.find((s) => s.id === data.providerInstanceId);
+        if (specificSetting && specificSetting.isConnected) {
+          // Remove from existing position if present
+          const existing = providersToTry.findIndex((p) => p.id === specificSetting.id);
+          if (existing >= 0) {
+            providersToTry.splice(existing, 1);
+          }
+          // Add at front regardless of status - user explicitly requested this provider
+          providersToTry.unshift({
+            id: specificSetting.id,
+            provider: specificSetting.provider,
+            apiKey: specificSetting.apiKey,
           });
         }
       }
       
-      console.log(`[Generate Video] Provider: ${provider}, Prompt: "${data.prompt.substring(0, 50)}..."`);
-      
-      const result = await generateVideo(provider, data.prompt, apiKey, data.referenceImageUrl);
-      
-      if (!result.success) {
-        console.error(`[Generate Video] Error: ${result.error}`);
-        return res.status(500).json({ 
-          success: false, 
-          error: result.error,
-          provider,
-        });
-      }
-      
-      if (result.jobId) {
-        storeJob(data.tileId, provider, result.jobId, "video");
+      // If no connected video providers, return placeholder
+      if (providersToTry.length === 0) {
+        console.log(`[Generate Video] No connected video providers, using placeholder`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         return res.json({
           success: true,
-          jobId: result.jobId,
-          provider,
-          status: "processing",
-          message: "Video generation started",
+          mediaUrl: `https://picsum.photos/seed/${data.tileId}/800/450`,
+          provider: "placeholder",
+          message: "No video AI provider connected. Add Runway, Luma, or Veo API key in Settings.",
         });
       }
       
-      res.json({
-        success: true,
-        mediaUrl: result.mediaUrl,
-        provider,
-        message: `Video generated with ${provider}`,
+      let lastError = "";
+      
+      for (const providerInfo of providersToTry) {
+        console.log(`[Generate Video] Trying provider: ${providerInfo.provider} (${providerInfo.id})`);
+        
+        try {
+          const result = await generateVideo(providerInfo.provider, data.prompt, providerInfo.apiKey, data.referenceImageUrl);
+          
+          if (result.success) {
+            // Reset provider status to active on successful generation
+            await storage.updateApiSetting(providerInfo.id, {
+              status: "active",
+              lastFailureAt: undefined,
+              failureReason: undefined,
+            });
+            
+            if (result.jobId) {
+              storeJob(data.tileId, providerInfo.provider, result.jobId, "video");
+              return res.json({
+                success: true,
+                jobId: result.jobId,
+                provider: providerInfo.provider,
+                providerId: providerInfo.id,
+                status: "processing",
+                message: "Video generation started",
+              });
+            }
+            
+            return res.json({
+              success: true,
+              mediaUrl: result.mediaUrl,
+              provider: providerInfo.provider,
+              providerId: providerInfo.id,
+              message: `Video generated with ${providerInfo.provider}`,
+            });
+          }
+          
+          lastError = result.error || "Unknown error";
+          console.log(`[Generate Video] ${providerInfo.provider} failed: ${lastError}`);
+          
+          await updateProviderStatusOnFailure(providerInfo.id, lastError);
+        } catch (providerError: any) {
+          lastError = providerError.message || "Provider error";
+          console.log(`[Generate Video] ${providerInfo.provider} threw error: ${lastError}`);
+          await updateProviderStatusOnFailure(providerInfo.id, lastError);
+        }
+      }
+      
+      // All providers failed
+      console.error(`[Generate Video] All providers failed. Last error: ${lastError}`);
+      return res.status(500).json({ 
+        success: false, 
+        error: lastError || "All providers failed",
       });
     } catch (error) {
       console.error("[Generate Video] Error:", error);

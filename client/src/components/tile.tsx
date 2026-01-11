@@ -21,7 +21,7 @@ interface TileProps {
 }
 
 // Free providers that don't require API keys (built-in, no settings required)
-const FREE_PROVIDERS: AIProvider[] = ["pollinations"];
+const FREE_PROVIDERS: AIProvider[] = ["pollinations", "huggingface"];
 
 // All provider types by category
 const imageProviderTypes: AIProvider[] = ["pollinations", "openai", "gemini", "stability", "flux", "ideogram", "huggingface", "hunyuan", "firefly", "bria", "runware", "replicate"];
@@ -34,6 +34,8 @@ const BUILTIN_POLLINATIONS = {
   instanceName: "Pollinations.ai (Free)",
   apiKey: "",
   isConnected: true,
+  priority: 9999,
+  status: "active" as const,
 };
 
 export function Tile({
@@ -54,14 +56,37 @@ export function Tile({
   // Get provider types for this tile type
   const providerTypesForTile = tile.type === "image" ? imageProviderTypes : videoProviderTypes;
   
-  // Build list of available provider instances:
-  // 1. Built-in free providers (Pollinations for images)
-  // 2. Connected settings from apiSettings that match tile type (only show connected ones)
+  // Build list of available provider instances sorted by priority:
+  // 1. Paid providers sorted by priority (active first, then non-active)
+  // 2. Free providers (always at bottom)
+  // 3. Built-in free provider (Pollinations for images) as ultimate fallback
+  // Note: Include non-active providers so users can manually retry them
+  const paidInstances = apiSettings
+    .filter((s) => 
+      providerTypesForTile.includes(s.provider) && 
+      s.isConnected && 
+      !FREE_PROVIDERS.includes(s.provider)
+    )
+    .sort((a, b) => {
+      // Active providers first
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (a.status !== "active" && b.status === "active") return 1;
+      // Then by priority
+      return (a.priority ?? 0) - (b.priority ?? 0);
+    });
+  
+  const freeInstances = apiSettings
+    .filter((s) => 
+      providerTypesForTile.includes(s.provider) && 
+      s.isConnected && 
+      FREE_PROVIDERS.includes(s.provider)
+    )
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+  
   const availableInstances = [
-    ...(tile.type === "image" ? [BUILTIN_POLLINATIONS] : []),
-    ...apiSettings.filter((s) => 
-      providerTypesForTile.includes(s.provider) && s.isConnected
-    ),
+    ...paidInstances,
+    ...freeInstances,
+    ...(tile.type === "image" && !freeInstances.some((i) => i.provider === "pollinations") ? [BUILTIN_POLLINATIONS] : []),
   ];
   
   const hasAvailableProviders = availableInstances.length > 0;
@@ -314,6 +339,7 @@ export function Tile({
                     <SelectContent>
                       {availableInstances.map((instance) => {
                         const isFree = FREE_PROVIDERS.includes(instance.provider);
+                        const isNonActive = instance.status && instance.status !== "active";
                         return (
                           <SelectItem key={instance.id} value={instance.id} className="text-xs">
                             <span className="flex items-center gap-2">
@@ -321,6 +347,17 @@ export function Tile({
                               {isFree ? (
                                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-500/20 text-green-600 dark:text-green-400 rounded">
                                   Free
+                                </span>
+                              ) : isNonActive ? (
+                                <span 
+                                  className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                                    instance.status === "depleted" 
+                                      ? "bg-red-500/20 text-red-600 dark:text-red-400" 
+                                      : "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                                  }`}
+                                  title={instance.status === "depleted" ? "Quota exhausted - click to retry" : "Rate limited - click to retry"}
+                                >
+                                  {instance.status === "depleted" ? "Depleted" : "Limited"}
                                 </span>
                               ) : instance.isConnected ? (
                                 <span className="w-2 h-2 rounded-full bg-green-500" title="API key connected" />

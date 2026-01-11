@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, Check, X, Loader2, Image, Video, Volume2, Plus, Trash2, Edit2 } from "lucide-react";
+import { Eye, EyeOff, Check, X, Loader2, Image, Video, Volume2, Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -91,8 +91,15 @@ interface SettingRowProps {
   onUpdate: (id: string, apiKey: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newName: string) => void;
+  onResetStatus?: (id: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   isSaving: boolean;
   isDeleting: boolean;
+  isResetting?: boolean;
+  showReorderControls?: boolean;
 }
 
 function SettingRow({
@@ -100,8 +107,15 @@ function SettingRow({
   onUpdate,
   onDelete,
   onRename,
+  onResetStatus,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
   isSaving,
   isDeleting,
+  isResetting,
+  showReorderControls,
 }: SettingRowProps) {
   const [showKey, setShowKey] = useState(false);
   const [editingKey, setEditingKey] = useState("");
@@ -169,7 +183,45 @@ function SettingRow({
                 >
                   <Edit2 className="w-3 h-3" />
                 </Button>
-                {setting.isConnected && (
+                {setting.status === "depleted" && (
+                  <>
+                    <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600 dark:text-red-400 text-xs">
+                      <AlertCircle className="w-3 h-3" />
+                      Quota Exceeded
+                    </Badge>
+                    {onResetStatus && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-5 text-xs px-2"
+                        onClick={() => onResetStatus(setting.id)}
+                        disabled={isResetting}
+                      >
+                        {isResetting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
+                      </Button>
+                    )}
+                  </>
+                )}
+                {setting.status === "temporarily_blocked" && (
+                  <>
+                    <Badge variant="secondary" className="gap-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs">
+                      <AlertCircle className="w-3 h-3" />
+                      Rate Limited
+                    </Badge>
+                    {onResetStatus && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-5 text-xs px-2"
+                        onClick={() => onResetStatus(setting.id)}
+                        disabled={isResetting}
+                      >
+                        {isResetting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
+                      </Button>
+                    )}
+                  </>
+                )}
+                {setting.isConnected && setting.status === "active" && (
                   <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600 dark:text-green-400 text-xs">
                     <Check className="w-3 h-3" />
                     Connected
@@ -187,15 +239,41 @@ function SettingRow({
             </p>
           </div>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-          onClick={() => onDelete(setting.id)}
-          disabled={isDeleting}
-        >
-          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          {showReorderControls && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={onMoveUp}
+                disabled={!canMoveUp}
+                title="Move up (higher priority)"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={onMoveDown}
+                disabled={!canMoveDown}
+                title="Move down (lower priority)"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => onDelete(setting.id)}
+            disabled={isDeleting}
+          >
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </Button>
+        </div>
       </div>
 
       {!config?.isFree && (
@@ -298,6 +376,62 @@ export function SettingsModal() {
     },
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const response = await apiRequest("POST", "/api/settings/reorder", { orderedIds });
+      return response.json() as Promise<APISetting[]>;
+    },
+    onSuccess: (reorderedSettings) => {
+      setApiSettings(reorderedSettings);
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+  });
+
+  const resetStatusMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/settings/${id}/reset-status`);
+      return response.json() as Promise<APISetting>;
+    },
+    onSuccess: (updatedSetting) => {
+      updateApiSettingInStore(updatedSetting.id, updatedSetting);
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Status reset",
+        description: `${updatedSetting.instanceName} is now active`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to reset status",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResetStatus = (id: string) => {
+    resetStatusMutation.mutate(id);
+  };
+
+  const handleMoveProvider = (id: string, direction: "up" | "down") => {
+    const sortedSettings = [...apiSettings].sort((a, b) => a.priority - b.priority);
+    const index = sortedSettings.findIndex((s) => s.id === id);
+    if (index === -1) return;
+
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= sortedSettings.length) return;
+
+    const newOrder = [...sortedSettings];
+    [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+
+    const orderedIds = newOrder.map((s) => s.id);
+    
+    const localUpdated = newOrder.map((s, i) => ({ ...s, priority: i }));
+    setApiSettings(localUpdated);
+    
+    reorderMutation.mutate(orderedIds);
+  };
+
   const handleAddProvider = () => {
     if (!selectedProvider) return;
     
@@ -331,6 +465,8 @@ export function SettingsModal() {
         instanceName,
         apiKey: "",
         isConnected: false,
+        priority: apiSettings.length,
+        status: "active",
       };
       addApiSetting(newSetting);
       setSelectedProvider("");
@@ -414,32 +550,132 @@ export function SettingsModal() {
   const connectedVideoCount = videoSettings.filter((s) => s.isConnected).length;
   const connectedAudioCount = audioSettings.filter((s) => s.isConnected).length;
 
-  const renderProviderList = (settings: APISetting[], emptyMessage: string) => {
-    if (settings.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Plus className="w-10 h-10 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">
-            Use the dropdown above to add AI services
-          </p>
-        </div>
-      );
-    }
+  const renderProviderList = (settings: APISetting[], category: "image" | "video" | "audio") => {
+    const paidSettings = settings
+      .filter((s) => !getProviderConfig(s.provider)?.isFree)
+      .sort((a, b) => a.priority - b.priority);
+    
+    const freeSettings = settings
+      .filter((s) => getProviderConfig(s.provider)?.isFree)
+      .sort((a, b) => a.priority - b.priority);
+    
+    const freeProviderConfigs = (category === "image" ? imageProviders : 
+                                  category === "video" ? videoProviders : 
+                                  audioProviders).filter((p) => p.isFree);
+
+    const hasPaidProviders = paidSettings.length > 0;
+    const hasFreeProviders = freeSettings.length > 0 || freeProviderConfigs.length > 0;
 
     return (
-      <div className="space-y-3 pr-4">
-        {settings.map((setting) => (
-          <SettingRow
-            key={setting.id}
-            setting={setting}
-            onUpdate={handleUpdateKey}
-            onDelete={handleDelete}
-            onRename={handleRename}
-            isSaving={saveSettingMutation.isPending || updateSettingMutation.isPending}
-            isDeleting={deleteSettingMutation.isPending}
-          />
-        ))}
+      <div className="space-y-4 pr-4">
+        {hasPaidProviders && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <span>Your Providers</span>
+              <span className="text-[10px]">(drag to set priority order)</span>
+            </div>
+            <div className="space-y-2">
+              {paidSettings.map((setting, index) => (
+                <SettingRow
+                  key={setting.id}
+                  setting={setting}
+                  onUpdate={handleUpdateKey}
+                  onDelete={handleDelete}
+                  onRename={handleRename}
+                  onResetStatus={handleResetStatus}
+                  onMoveUp={() => handleMoveProvider(setting.id, "up")}
+                  onMoveDown={() => handleMoveProvider(setting.id, "down")}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < paidSettings.length - 1}
+                  showReorderControls={paidSettings.length > 1}
+                  isSaving={saveSettingMutation.isPending || updateSettingMutation.isPending}
+                  isDeleting={deleteSettingMutation.isPending}
+                  isResetting={resetStatusMutation.isPending}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!hasPaidProviders && (
+          <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg bg-muted/30">
+            <Plus className="w-8 h-8 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">No paid providers added yet</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              Add a provider using the dropdown above
+            </p>
+          </div>
+        )}
+
+        {hasFreeProviders && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground border-t pt-3">
+              <span>Free Providers (Always Available)</span>
+            </div>
+            <div className="space-y-2">
+              {freeSettings.map((setting) => (
+                <SettingRow
+                  key={setting.id}
+                  setting={setting}
+                  onUpdate={handleUpdateKey}
+                  onDelete={handleDelete}
+                  onRename={handleRename}
+                  onResetStatus={handleResetStatus}
+                  showReorderControls={false}
+                  isSaving={saveSettingMutation.isPending || updateSettingMutation.isPending}
+                  isDeleting={deleteSettingMutation.isPending}
+                  isResetting={resetStatusMutation.isPending}
+                />
+              ))}
+              {freeProviderConfigs
+                .filter((p) => !freeSettings.some((s) => s.provider === p.id))
+                .map((provider) => (
+                  <div key={provider.id} className="p-3 border rounded-md border-dashed opacity-60">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <span className="text-xs font-semibold">
+                          {provider.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{provider.name}</span>
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs">
+                            Free
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {provider.description}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedProvider(provider.id);
+                          setTimeout(() => {
+                            const config = getProviderConfig(provider.id);
+                            if (config) {
+                              const existingCount = apiSettings.filter((s) => s.provider === provider.id).length;
+                              const instanceName = existingCount > 0 ? `${config.name} ${existingCount + 1}` : config.name;
+                              saveSettingMutation.mutate({
+                                provider: provider.id,
+                                instanceName,
+                                apiKey: "",
+                              });
+                            }
+                          }, 0);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -536,19 +772,19 @@ export function SettingsModal() {
 
           <TabsContent value="image-providers" className="flex-1 overflow-hidden mt-4">
             <ScrollArea className="h-[45vh]">
-              {renderProviderList(imageSettings, "No image providers added yet")}
+              {renderProviderList(imageSettings, "image")}
             </ScrollArea>
           </TabsContent>
 
           <TabsContent value="video-providers" className="flex-1 overflow-hidden mt-4">
             <ScrollArea className="h-[45vh]">
-              {renderProviderList(videoSettings, "No video providers added yet")}
+              {renderProviderList(videoSettings, "video")}
             </ScrollArea>
           </TabsContent>
 
           <TabsContent value="audio-providers" className="flex-1 overflow-hidden mt-4">
             <ScrollArea className="h-[45vh]">
-              {renderProviderList(audioSettings, "No audio providers added yet")}
+              {renderProviderList(audioSettings, "audio")}
             </ScrollArea>
           </TabsContent>
         </Tabs>
